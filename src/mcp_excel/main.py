@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """MCP Excel Server - Main entry point."""
 
 import asyncio
@@ -10,10 +15,17 @@ from mcp.types import Tool, TextContent
 
 from .core.file_loader import FileLoader
 from .models.requests import (
+    AggregateRequest,
+    FilterAndCountRequest,
+    FilterAndGetRowsRequest,
     GetColumnNamesRequest,
     GetSheetInfoRequest,
+    GetUniqueValuesRequest,
+    GetValueCountsRequest,
+    GroupByRequest,
     InspectFileRequest,
 )
+from .operations.data_operations import DataOperations
 from .operations.inspection import InspectionOperations
 
 # Configure logging
@@ -32,6 +44,7 @@ class MCPExcelServer:
         self.server = Server("mcp-excel")
         self.file_loader = FileLoader()
         self.inspection_ops = InspectionOperations(self.file_loader)
+        self.data_ops = DataOperations(self.file_loader)
 
         # Register handlers
         self._register_handlers()
@@ -101,6 +114,298 @@ class MCPExcelServer:
                         "required": ["file_path", "sheet_name"],
                     },
                 ),
+                Tool(
+                    name="get_unique_values",
+                    description="Get unique values from a column (useful for building filters)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "column": {
+                                "type": "string",
+                                "description": "Column name to get unique values from",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of unique values to return (default: 100)",
+                                "default": 100,
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "column"],
+                    },
+                ),
+                Tool(
+                    name="get_value_counts",
+                    description="Get frequency counts for values in a column (top N most common values)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "column": {
+                                "type": "string",
+                                "description": "Column name to analyze",
+                            },
+                            "top_n": {
+                                "type": "integer",
+                                "description": "Number of top values to return (default: 10)",
+                                "default": 10,
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "column"],
+                    },
+                ),
+                Tool(
+                    name="filter_and_count",
+                    description="Count rows matching filter conditions",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "List of filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "filters"],
+                    },
+                ),
+                Tool(
+                    name="filter_and_get_rows",
+                    description="Get rows matching filter conditions with pagination support",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "List of filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to return (optional, returns all if not specified)",
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of rows to return (default: 50)",
+                                "default": 50,
+                            },
+                            "offset": {
+                                "type": "integer",
+                                "description": "Number of rows to skip (default: 0)",
+                                "default": 0,
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "filters"],
+                    },
+                ),
+                Tool(
+                    name="aggregate",
+                    description="Perform aggregation (sum, mean, count, etc.) on a column with optional filters",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "operation": {
+                                "type": "string",
+                                "enum": ["sum", "mean", "median", "min", "max", "std", "var", "count"],
+                                "description": "Aggregation operation to perform",
+                            },
+                            "target_column": {
+                                "type": "string",
+                                "description": "Column to aggregate",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "operation", "target_column"],
+                    },
+                ),
+                Tool(
+                    name="group_by",
+                    description="Group data by columns and perform aggregation (like Excel Pivot Table)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "group_columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to group by (can be multiple)",
+                            },
+                            "agg_column": {
+                                "type": "string",
+                                "description": "Column to aggregate",
+                            },
+                            "agg_operation": {
+                                "type": "string",
+                                "enum": ["sum", "mean", "median", "min", "max", "std", "var", "count"],
+                                "description": "Aggregation operation",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "group_columns", "agg_column", "agg_operation"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -122,6 +427,36 @@ class MCPExcelServer:
                 elif name == "get_column_names":
                     request = GetColumnNamesRequest(**arguments)
                     response = self.inspection_ops.get_column_names(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "get_unique_values":
+                    request = GetUniqueValuesRequest(**arguments)
+                    response = self.data_ops.get_unique_values(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "get_value_counts":
+                    request = GetValueCountsRequest(**arguments)
+                    response = self.data_ops.get_value_counts(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "filter_and_count":
+                    request = FilterAndCountRequest(**arguments)
+                    response = self.data_ops.filter_and_count(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "filter_and_get_rows":
+                    request = FilterAndGetRowsRequest(**arguments)
+                    response = self.data_ops.filter_and_get_rows(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "aggregate":
+                    request = AggregateRequest(**arguments)
+                    response = self.data_ops.aggregate(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "group_by":
+                    request = GroupByRequest(**arguments)
+                    response = self.data_ops.group_by(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 else:

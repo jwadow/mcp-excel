@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """Pydantic models for API responses."""
 
 from typing import Any, Optional
@@ -130,7 +135,7 @@ class FilterAndGetRowsResponse(BaseModel):
 class AggregateResponse(BaseModel):
     """Response for aggregation."""
 
-    value: float = Field(description="Aggregated value")
+    value: int | float = Field(description="Aggregated value")
     operation: str = Field(description="Operation performed")
     target_column: str = Field(description="Column that was aggregated")
     filters_applied: list[dict[str, Any]] = Field(description="Filters that were applied")
@@ -169,8 +174,8 @@ class ColumnStats(BaseModel):
     mean: Optional[float] = Field(default=None, description="Mean value")
     median: Optional[float] = Field(default=None, description="Median value")
     std: Optional[float] = Field(default=None, description="Standard deviation")
-    min: Optional[float] = Field(default=None, description="Minimum value")
-    max: Optional[float] = Field(default=None, description="Maximum value")
+    min: Optional[int | float] = Field(default=None, description="Minimum value")
+    max: Optional[int | float] = Field(default=None, description="Maximum value")
     q25: Optional[float] = Field(default=None, description="25th percentile")
     q75: Optional[float] = Field(default=None, description="75th percentile")
     null_count: int = Field(description="Number of null values")

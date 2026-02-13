@@ -1,6 +1,8 @@
-# MCP Excel Server
+# Excel MCP Server
 
 MCP server for Excel file operations using atomic primitives. Enables AI agents to analyze Excel files through composable operations without loading raw data into context.
+
+Made with ❤️ by [Jwadow](https://github.com/jwadow)
 
 ## Philosophy
 
@@ -84,6 +86,8 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 1. **FileLoader Test**: Loads file, shows structure, demonstrates caching
 2. **HeaderDetector Test**: Automatically detects header row in messy files
 3. **InspectionOperations Test**: Shows file inspection and sheet analysis
+4. **DataOperations Test**: Tests filtering, unique values, and data retrieval (5 tests)
+5. **AggregationOperations Test**: Tests aggregation and group-by operations (6 tests)
 
 ### Example Output:
 
@@ -200,6 +204,139 @@ Quick operation to get just the column names.
 - List of column names
 - Column count
 
+### 4. `get_unique_values`
+
+Get unique values from a column (useful for building filters).
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "column": "Customer",
+  "limit": 100
+}
+```
+
+**Output:**
+- List of unique values
+- Count of unique values
+- Truncated flag if limit exceeded
+
+### 5. `get_value_counts`
+
+Get frequency counts for values in a column (top N most common).
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "column": "Status",
+  "top_n": 10
+}
+```
+
+**Output:**
+- Dictionary of value -> count
+- Total number of values
+- TSV output for Excel
+
+### 6. `filter_and_count`
+
+Count rows matching filter conditions.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "filters": [
+    {"column": "Customer", "operator": "==", "value": "Acme Corp"},
+    {"column": "Amount", "operator": ">", "value": 1000}
+  ],
+  "logic": "AND"
+}
+```
+
+**Output:**
+- Count of matching rows
+- Excel formula (e.g., `=COUNTIFS(...)`)
+- Applied filters
+
+**Supported operators:** `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`, `not_in`, `contains`, `startswith`, `endswith`, `regex`, `is_null`, `is_not_null`
+
+### 7. `filter_and_get_rows`
+
+Get rows matching filter conditions with pagination.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "filters": [
+    {"column": "Status", "operator": "==", "value": "Active"}
+  ],
+  "columns": ["Customer", "Amount", "Date"],
+  "limit": 50,
+  "offset": 0,
+  "logic": "AND"
+}
+```
+
+**Output:**
+- Filtered rows as list of dictionaries
+- Total matches count
+- Truncated flag
+- TSV output for Excel
+
+### 8. `aggregate`
+
+Perform aggregation (sum, mean, count, etc.) on a column with optional filters.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "operation": "sum",
+  "target_column": "Amount",
+  "filters": [
+    {"column": "Customer", "operator": "==", "value": "Acme Corp"}
+  ]
+}
+```
+
+**Output:**
+- Aggregated value
+- Excel formula (e.g., `=SUMIF(...)`)
+- Applied filters
+
+**Supported operations:** `sum`, `mean`, `median`, `min`, `max`, `std`, `var`, `count`
+
+**Special feature:** Automatically converts text-stored numbers to numeric (common Excel issue).
+
+### 9. `group_by`
+
+Group data by columns and perform aggregation (like Excel Pivot Table).
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "group_columns": ["Customer", "Month"],
+  "agg_column": "Amount",
+  "agg_operation": "sum"
+}
+```
+
+**Output:**
+- Grouped data with aggregated values
+- TSV output for Excel
+- Supports multiple grouping columns
+
 ## Architecture
 
 ```
@@ -213,8 +350,9 @@ mcp-excel/
 │   │   ├── requests.py    # Request models
 │   │   └── responses.py   # Response models
 │   ├── operations/        # Business logic
-│   │   ├── inspection.py  # File/sheet inspection
-│   │   └── filtering.py   # Filter engine
+│   │   ├── inspection.py     # File/sheet inspection
+│   │   ├── data_operations.py # Data filtering and aggregation
+│   │   └── filtering.py      # Filter engine
 │   ├── excel/             # Excel-specific functionality
 │   │   ├── formula_generator.py # Excel formula generation
 │   │   └── tsv_formatter.py     # TSV formatting
@@ -254,16 +392,18 @@ poetry run mypy src/
 
 ## Roadmap
 
-### Phase 1: Core Operations (Current)
+### Phase 1: Core Operations ✅ COMPLETED
 - ✅ File inspection
 - ✅ Sheet analysis
 - ✅ Column operations
-- ⏳ Filtering and counting
-- ⏳ Basic aggregations
+- ✅ Filtering and counting
+- ✅ Basic aggregations
+- ✅ Data retrieval with pagination
+- ✅ Unique values and frequency analysis
 
-### Phase 2: Advanced Analytics
-- ⏳ Group-by operations
-- ⏳ Statistical analysis
+### Phase 2: Advanced Analytics (In Progress)
+- ✅ Group-by operations
+- ⏳ Statistical analysis (get_column_stats)
 - ⏳ Correlation analysis
 - ⏳ Outlier detection
 

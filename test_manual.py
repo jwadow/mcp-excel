@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """Manual testing script for MCP Excel Server.
 
 This script allows you to test the core functionality without running the MCP server.
@@ -14,10 +19,18 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from mcp_excel.core.file_loader import FileLoader
 from mcp_excel.core.header_detector import HeaderDetector
 from mcp_excel.models.requests import (
+    AggregateRequest,
+    FilterAndCountRequest,
+    FilterAndGetRowsRequest,
+    FilterCondition,
     GetColumnNamesRequest,
     GetSheetInfoRequest,
+    GetUniqueValuesRequest,
+    GetValueCountsRequest,
+    GroupByRequest,
     InspectFileRequest,
 )
+from mcp_excel.operations.data_operations import DataOperations
 from mcp_excel.operations.inspection import InspectionOperations
 
 
@@ -136,6 +149,362 @@ def test_inspection_operations(file_path: str) -> None:
             print(f"    Row {idx}: {dict(list(row.items())[:3])}...")
 
 
+def test_data_operations(file_path: str) -> None:
+    """Test DataOperations functionality."""
+    print_section("Testing DataOperations")
+
+    loader = FileLoader()
+    ops = DataOperations(loader)
+
+    # Get first sheet name
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info to know available columns
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in sheet")
+        return
+
+    print(f"\n📋 Available columns: {', '.join(sheet_info.column_names[:5])}...")
+    first_column = sheet_info.column_names[0]
+
+    # Test 1: Get unique values
+    print(f"\n\n🔍 Test 1: Getting unique values from '{first_column}'...")
+    try:
+        request = GetUniqueValuesRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=first_column,
+            limit=10
+        )
+        response = ops.get_unique_values(request)
+        
+        print(f"  ✅ Found {response.count} unique values")
+        print(f"  Truncated: {response.truncated}")
+        print(f"  Values: {response.values[:5]}...")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 2: Get value counts
+    print(f"\n\n📊 Test 2: Getting value counts from '{first_column}'...")
+    try:
+        request = GetValueCountsRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=first_column,
+            top_n=5
+        )
+        response = ops.get_value_counts(request)
+        
+        print(f"  ✅ Total values: {response.total_values}")
+        print(f"  Top values:")
+        for value, count in list(response.value_counts.items())[:5]:
+            print(f"    {value}: {count}")
+        print(f"\n  📋 TSV Output (first 100 chars):")
+        print(f"    {response.excel_output.tsv[:100]}...")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 3: Filter and count
+    print(f"\n\n🔢 Test 3: Counting rows with filter...")
+    unique_response = None  # Initialize to avoid scope issues
+    try:
+        # Get a value to filter on
+        unique_request = GetUniqueValuesRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=first_column,
+            limit=1
+        )
+        unique_response = ops.get_unique_values(unique_request)
+        
+        if unique_response.values:
+            filter_value = unique_response.values[0]
+            print(f"  Filtering where '{first_column}' == '{filter_value}'")
+            
+            request = FilterAndCountRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                filters=[
+                    FilterCondition(column=first_column, operator="==", value=filter_value)
+                ],
+                logic="AND"
+            )
+            response = ops.filter_and_count(request)
+            
+            print(f"  ✅ Matching rows: {response.count}")
+            print(f"  📋 Excel formula: {response.excel_output.formula}")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        else:
+            print(f"  ⚠️ No values found to filter on")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 4: Filter and get rows
+    print(f"\n\n📄 Test 4: Getting filtered rows...")
+    try:
+        # Use same filter as above
+        if unique_response and unique_response.values:
+            filter_value = unique_response.values[0]
+            
+            request = FilterAndGetRowsRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                filters=[
+                    FilterCondition(column=first_column, operator="==", value=filter_value)
+                ],
+                columns=sheet_info.column_names[:3],  # First 3 columns only
+                limit=5,
+                offset=0,
+                logic="AND"
+            )
+            response = ops.filter_and_get_rows(request)
+            
+            print(f"  ✅ Returned {response.count} rows (total matches: {response.total_matches})")
+            print(f"  Truncated: {response.truncated}")
+            print(f"\n  Sample rows:")
+            for idx, row in enumerate(response.rows[:3], 1):
+                print(f"    Row {idx}: {dict(list(row.items())[:3])}")
+            print(f"\n  📋 TSV Output (first 150 chars):")
+            print(f"    {response.excel_output.tsv[:150]}...")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        else:
+            print(f"  ⚠️ No values found to filter on")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 5: Complex filter (multiple conditions)
+    print(f"\n\n🔍 Test 5: Complex filter with multiple conditions...")
+    try:
+        if len(sheet_info.column_names) >= 2 and unique_response and unique_response.values:
+            first_col = sheet_info.column_names[0]
+            second_col = sheet_info.column_names[1]
+            filter_value = unique_response.values[0]
+            
+            # Get a value from second column
+            unique_request2 = GetUniqueValuesRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                column=second_col,
+                limit=1
+            )
+            unique_response2 = ops.get_unique_values(unique_request2)
+            
+            if unique_response2.values:
+                filter_value2 = unique_response2.values[0]
+                print(f"  Filtering: '{first_col}' == '{filter_value}' AND '{second_col}' == '{filter_value2}'")
+                
+                request = FilterAndCountRequest(
+                    file_path=file_path,
+                    sheet_name=sheet_name,
+                    filters=[
+                        FilterCondition(column=first_col, operator="==", value=filter_value),
+                        FilterCondition(column=second_col, operator="==", value=filter_value2)
+                    ],
+                    logic="AND"
+                )
+                response = ops.filter_and_count(request)
+                
+                print(f"  ✅ Matching rows: {response.count}")
+                print(f"  📋 Excel formula: {response.excel_output.formula}")
+                print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+            else:
+                print(f"  ⚠️ Not enough data for complex filter test")
+        else:
+            print(f"  ⚠️ Not enough columns for complex filter test")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+
+def test_aggregation_operations(file_path: str) -> None:
+    """Test aggregation operations."""
+    print_section("Testing Aggregation Operations")
+
+    loader = FileLoader()
+    ops = DataOperations(loader)
+
+    # Get first sheet name
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info to know available columns
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in sheet")
+        return
+
+    # Find a numeric column for aggregation
+    numeric_column = None
+    for col_name, col_type in sheet_info.column_types.items():
+        if col_type in ["integer", "float"]:
+            numeric_column = col_name
+            break
+    
+    if not numeric_column:
+        # Try first column as fallback (often contains IDs/numbers)
+        numeric_column = sheet_info.column_names[0]
+        print(f"  ℹ️ No numeric columns found, trying '{numeric_column}' (may contain numeric data as text)")
+
+    print(f"\n📋 Using numeric column: {numeric_column}")
+    first_column = sheet_info.column_names[0]
+
+    # Test 1: Simple aggregation (count)
+    print(f"\n\n🔢 Test 1: Count aggregation on '{numeric_column}'...")
+    try:
+        request = AggregateRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            operation="count",
+            target_column=numeric_column,
+            filters=[]
+        )
+        response = ops.aggregate(request)
+        
+        print(f"  ✅ Count: {response.value}")
+        print(f"  Operation: {response.operation}")
+        print(f"  📋 Excel formula: {response.excel_output.formula}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 2: Sum aggregation
+    print(f"\n\n➕ Test 2: Sum aggregation on '{numeric_column}'...")
+    try:
+        request = AggregateRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            operation="sum",
+            target_column=numeric_column,
+            filters=[]
+        )
+        response = ops.aggregate(request)
+        
+        print(f"  ✅ Sum: {response.value}")
+        print(f"  📋 Excel formula: {response.excel_output.formula}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 3: Mean aggregation
+    print(f"\n\n📊 Test 3: Mean aggregation on '{numeric_column}'...")
+    try:
+        request = AggregateRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            operation="mean",
+            target_column=numeric_column,
+            filters=[]
+        )
+        response = ops.aggregate(request)
+        
+        print(f"  ✅ Mean: {response.value:.2f}")
+        print(f"  📋 Excel formula: {response.excel_output.formula}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 4: Aggregation with filter
+    print(f"\n\n🔍 Test 4: Aggregation with filter...")
+    try:
+        # Get a value to filter on
+        unique_request = GetUniqueValuesRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=first_column,
+            limit=1
+        )
+        unique_response = ops.get_unique_values(unique_request)
+        
+        if unique_response.values:
+            filter_value = unique_response.values[0]
+            print(f"  Filtering where '{first_column}' == '{filter_value}'")
+            
+            request = AggregateRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                operation="count",
+                target_column=numeric_column,
+                filters=[
+                    FilterCondition(column=first_column, operator="==", value=filter_value)
+                ]
+            )
+            response = ops.aggregate(request)
+            
+            print(f"  ✅ Filtered count: {response.value}")
+            print(f"  📋 Excel formula: {response.excel_output.formula}")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        else:
+            print(f"  ⚠️ No values found to filter on")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 5: Group by single column
+    print(f"\n\n📊 Test 5: Group by '{first_column}' with sum...")
+    try:
+        request = GroupByRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            group_columns=[first_column],
+            agg_column=numeric_column,
+            agg_operation="sum",
+            filters=[]
+        )
+        response = ops.group_by(request)
+        
+        print(f"  ✅ Found {len(response.groups)} groups")
+        print(f"  Sample groups (first 3):")
+        for idx, group in enumerate(response.groups[:3], 1):
+            print(f"    Group {idx}: {dict(list(group.items())[:3])}")
+        print(f"\n  📋 TSV Output (first 150 chars):")
+        print(f"    {response.excel_output.tsv[:150]}...")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 6: Group by multiple columns
+    if len(sheet_info.column_names) >= 2:
+        print(f"\n\n📊 Test 6: Group by multiple columns...")
+        try:
+            second_column = sheet_info.column_names[1]
+            request = GroupByRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                group_columns=[first_column, second_column],
+                agg_column=numeric_column,
+                agg_operation="count",
+                filters=[]
+            )
+            response = ops.group_by(request)
+            
+            print(f"  ✅ Found {len(response.groups)} groups")
+            print(f"  Group columns: {response.group_columns}")
+            print(f"  Sample groups (first 2):")
+            for idx, group in enumerate(response.groups[:2], 1):
+                print(f"    Group {idx}: {group}")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+
+
 def main() -> None:
     """Main test function."""
     print("\n" + "=" * 80)
@@ -172,6 +541,8 @@ def main() -> None:
             test_header_detector(file_path, sheet_names[0])
 
         test_inspection_operations(file_path)
+        test_data_operations(file_path)
+        test_aggregation_operations(file_path)
 
         print_section("✅ All Tests Completed Successfully")
 
