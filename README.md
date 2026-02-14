@@ -1,61 +1,108 @@
-# Excel MCP Server
+<div align="center">
 
-MCP server for Excel file operations using atomic primitives. Enables AI agents to analyze Excel files through composable operations without loading raw data into context.
+# 📊 Excel MCP Server
 
-Made with ❤️ by [Jwadow](https://github.com/jwadow)
+**MCP server for Excel file operations using atomic primitives**
 
-## Philosophy
+Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
-- **Atomic Operations**: Agent combines primitive operations instead of loading entire datasets
-- **Stateless Architecture**: No session management - automatic LRU caching based on file path
-- **Dynamic Results**: Generates Excel formulas for copy-paste, not static values
-- **Read-Only**: Current version doesn't modify files (safe for legacy .xls format)
-- **Universal**: Works with any tabular data without domain-specific hardcoding
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
+[![Tools](https://img.shields.io/badge/tools-22-orange.svg)](#available-tools)
 
-## Features
+Enables AI agents to analyze Excel files through composable operations without loading raw data into context
 
-- ✅ Automatic header detection for messy Excel files
-- ✅ LRU caching with memory management
-- ✅ Support for both .xls and .xlsx formats
-- ✅ Excel formula generation for dynamic calculations
-- ✅ TSV output for easy copy-paste into Excel
-- ✅ Comprehensive filtering system
-- ✅ Performance metrics for every operation
+*Works with Claude Code, OpenCode, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
 
-## Installation
+[What You Can Do](#what-you-can-do) • [Installation](#installation) • [Configuration](#configuration) • [Available Tools](#available-tools) • [💖 Sponsor](#-support-the-project)
 
-### Prerequisites
+</div>
+
+---
+
+## What You Can Do
+
+- 📊 **Analyze any Excel file** (.xls and .xlsx) without opening Excel
+- 🔍 **Filter and search** data with 12 operators (==, !=, >, <, in, contains, regex, etc.)
+- 📈 **Aggregate and group** data (sum, average, count, pivot tables)
+- 📉 **Statistical analysis** (correlations, outliers, distributions)
+- 📅 **Time series analysis** (period-over-period growth, moving averages, running totals)
+- 🏆 **Rank and sort** (top-N, bottom-N, percentiles)
+- ✅ **Validate data** (find duplicates, null values)
+- 🔄 **Compare sheets** (find differences between versions)
+- 📋 **Copy results to Excel** - generates formulas and TSV for instant paste
+- 🤖 **Works with any AI agent** - Claude Code, Cline, Roo Code, Cursor, and more
+
+## Prerequisites
 
 - Python 3.10 or higher
 - Poetry (recommended) or pip
 
-### Using Poetry (Recommended)
+## Installation
 
 ```bash
-# Install dependencies
-poetry install
-
-# Activate virtual environment
-poetry shell
+# Clone the repository
+git clone https://github.com/jwadow/mcp-excel.git
+cd mcp-excel
 ```
 
-### Using pip
+Then install dependencies using one of these methods:
 
+**Option A: Using Poetry (Recommended)**
 ```bash
-# Create virtual environment
+poetry install
+```
+
+**Option B: Using pip**
+```bash
 python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-venv\Scripts\activate
-# On Linux/Mac:
-source venv/bin/activate
-
-# Install dependencies
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
 pip install -e .
 ```
 
-## Manual Testing
+## Configuration
+
+⚠️ **Important:** This is an MCP server. It runs automatically when your AI agent needs it. Do not run it manually in terminal.
+
+### Supported AI Agents
+
+Works with any MCP-compatible AI agent: *Claude Code, OpenCode, Codex app, Cursor, Cline, Roo Code, Kilo Code*
+
+### Configuration Steps
+
+1. Open your AI agent's MCP settings
+2. Add new MCP server with these parameters:
+   - **Command:** `python`
+   - **Args:** `["-m", "mcp_excel.main"]`
+   - **Working Directory:** `/path/to/mcp-excel` (replace with actual path)
+
+**Example JSON configuration** (if your agent uses JSON config):
+```json
+{
+  "mcpServers": {
+    "excel": {
+      "command": "python",
+      "args": ["-m", "mcp_excel.main"],
+      "cwd": "/path/to/mcp-excel"
+    }
+  }
+}
+```
+
+## Usage
+
+After configuration, restart your AI agent and ask it to analyze Excel files:
+
+```
+"Analyze the Excel file at C:/Users/YourName/Documents/sales.xls"
+"Show me top 10 customers by revenue from sales.xlsx"
+"Find duplicates in column 'Email' in contacts.xlsx"
+"Calculate month-over-month growth from revenue.xls"
+```
+
+## Manual Testing (Optional)
 
 Test the core functionality without running the MCP server.
 
@@ -616,82 +663,81 @@ Calculate expression between columns (arithmetic operations).
 - "Calculate margin = (Revenue - Cost) / Revenue"
 - "Calculate average speed = Distance / Time"
 
-## Architecture
-
-```
-mcp-excel/
-├── src/mcp_excel/
-│   ├── core/              # Core functionality
-│   │   ├── cache.py       # LRU cache with memory management
-│   │   ├── file_loader.py # File loading with format detection
-│   │   └── header_detector.py # Intelligent header detection
-│   ├── models/            # Pydantic schemas
-│   │   ├── requests.py    # Request models
-│   │   └── responses.py   # Response models
-│   ├── operations/        # Business logic
-│   │   ├── inspection.py     # File/sheet inspection
-│   │   ├── data_operations.py # Data filtering and aggregation
-│   │   └── filtering.py      # Filter engine
-│   ├── excel/             # Excel-specific functionality
-│   │   ├── formula_generator.py # Excel formula generation
-│   │   └── tsv_formatter.py     # TSV formatting
-│   └── main.py            # MCP server entry point
-├── tests/                 # Test suite
-├── test_manual.py         # Manual testing script
-└── pyproject.toml         # Dependencies and config
-```
-
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-poetry run pytest
-
-# Run with coverage
-poetry run pytest --cov=mcp_excel
-
-# Run specific test file
-poetry run pytest tests/test_operations.py
-```
-
-### Code Quality
-
-```bash
-# Format code
-poetry run black src/ tests/
-
-# Lint code
-poetry run ruff check src/ tests/
-
-# Type checking
-poetry run mypy src/
-```
-
 ## Roadmap
 
-### Future Enhancements
-- ⏳ Write operations (xlsx only)
-- ⏳ CSV support
-- ⏳ SSE transport mode
-- ⏳ Advanced formula generation
+- Write operations (xlsx only)
+- CSV support
+- SSE transport mode
+- Advanced formula generation
 
-## License
+---
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+## 📜 License
 
-See [LICENSE](LICENSE) for details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+This means:
+- ✅ You can use, modify, and distribute this software
+- ✅ You can use it for commercial purposes
+- ⚠️ **You must disclose source code** when you distribute the software
+- ⚠️ **Network use is distribution** — if you run a modified version on a server and let others interact with it, you must make the source code available
+- ⚠️ Modifications must be released under the same license
+
+See the [LICENSE](LICENSE) file for the full license text.
+
+### Why AGPL-3.0?
+
+AGPL-3.0 ensures that improvements to this software benefit the entire community. If you modify this server and deploy it as a service, you must share your improvements with your users.
+
+---
+
+## 💖 Support the Project
+
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Smilies/Smiling%20Face%20with%20Hearts.png" alt="Love" width="80" />
+
+**If this project saved you time or money, consider supporting it!**
+
+Every contribution helps keep this project alive and growing
+
+<br>
+
+### 🤑 Donate
+
+[**☕ One-time Donation**](https://app.lava.top/jwadow?tabId=donate) &nbsp;•&nbsp; [**💎 Monthly Support**](https://app.lava.top/jwadow?tabId=subscriptions)
+
+<br>
+
+### 🪙 Or send crypto
+
+| Currency | Network | Address |
+|:--------:|:-------:|:--------|
+| **USDT** | TRC20 | `TSVtgRc9pkC1UgcbVeijBHjFmpkYHDRu26` |
+| **BTC** | Bitcoin | `12GZqxqpcBsqJ4Vf1YreLqwoMGvzBPgJq6` |
+| **ETH** | Ethereum | `0xc86eab3bba3bbaf4eb5b5fff8586f1460f1fd395` |
+| **SOL** | Solana | `9amykF7KibZmdaw66a1oqYJyi75fRqgdsqnG66AK3jvh` |
+| **TON** | TON | `UQBVh8T1H3GI7gd7b-_PPNnxHYYxptrcCVf3qQk5v41h3QTM` |
+
+</div>
+
+---
 
 ## Contributing
 
 Contributions are welcome! Please ensure:
 
 1. All dependencies are AGPL-compatible
-2. Code follows the existing style (black, ruff, mypy)
+2. Code follows the existing style
 3. Tests are included for new features
 4. Documentation is updated
 
-## Support
-
 For issues, questions, or contributions, please open an issue on GitHub.
+
+---
+
+<div align="center">
+
+**[⬆ Back to Top](#-excel-mcp-server)**
+
+</div>
