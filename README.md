@@ -10,6 +10,7 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
 [![Tools](https://img.shields.io/badge/tools-22-orange.svg)](#available-tools)
+[![Sponsor](https://img.shields.io/badge/💖_Sponsor-Support_Development-ff69b4)](#-support-the-project)
 
 Enables AI agents to analyze Excel files through composable operations without loading raw data into context
 
