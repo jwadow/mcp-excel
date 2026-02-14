@@ -135,13 +135,10 @@ class StatisticsOperations:
         else:
             df_preview = self._loader.load(file_path, sheet_name, header_row=None, use_cache=True)
             detection_result = self._header_detector.detect(df_preview)
-
-            if detection_result.confidence >= 0.8:
-                detected_row = detection_result.header_row
-                df = self._loader.load(file_path, sheet_name, header_row=detected_row, use_cache=True)
-            else:
-                detected_row = 0
-                df = self._loader.load(file_path, sheet_name, header_row=0, use_cache=True)
+            
+            # Always trust the detector - it picks the best candidate from first 20 rows
+            detected_row = detection_result.header_row
+            df = self._loader.load(file_path, sheet_name, header_row=detected_row, use_cache=True)
 
         # Normalize column names to strings
         df.columns = [str(col) for col in df.columns]
