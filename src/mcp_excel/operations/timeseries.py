@@ -45,6 +45,23 @@ class TimeSeriesOperations:
         self._filter_engine = FilterEngine()
         self._tsv_formatter = TSVFormatter()
 
+    def _column_letter(self, col_index: int) -> str:
+        """Convert column index to Excel letter (supports AA, AB, etc).
+
+        Args:
+            col_index: Zero-based column index
+
+        Returns:
+            Excel column letter (A, B, ..., Z, AA, AB, ...)
+        """
+        result = ""
+        col_index += 1  # Excel is 1-based
+        while col_index > 0:
+            col_index -= 1
+            result = chr(65 + (col_index % 26)) + result
+            col_index //= 26
+        return result
+
     def _format_value(self, value: Any) -> Any:
         """Format value for output (convert float to int if whole number).
 
@@ -290,7 +307,10 @@ class TimeSeriesOperations:
         tsv = self._tsv_formatter.format_table(headers, tsv_rows)
 
         # Generate Excel formula
-        formula = "=SUM($B$2:B2)"
+        # Find value_column index in result_columns
+        value_col_idx = result_columns.index(request.value_column)
+        value_col_letter = self._column_letter(value_col_idx)
+        formula = f"=SUM(${value_col_letter}$2:{value_col_letter}2)"
 
         return CalculateRunningTotalResponse(
             rows=rows,
@@ -362,7 +382,11 @@ class TimeSeriesOperations:
         tsv = self._tsv_formatter.format_table(headers, tsv_rows)
 
         # Generate Excel formula
-        formula = f"=AVERAGE(B{max(1, 2-request.window_size+1)}:B2)"
+        # Find value_column index in result_columns
+        value_col_idx = result_columns.index(request.value_column)
+        value_col_letter = self._column_letter(value_col_idx)
+        start_row = max(2, 3 - request.window_size)  # Don't go below row 2 (first data row)
+        formula = f"=AVERAGE({value_col_letter}{start_row}:{value_col_letter}2)"
 
         return CalculateMovingAverageResponse(
             rows=rows,

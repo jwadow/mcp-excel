@@ -195,10 +195,21 @@ class AdvancedOperations:
         tsv_rows = [[row[col] for col in result_columns] for row in rows]
         tsv = self._tsv_formatter.format_table(headers, tsv_rows)
 
-        # Generate Excel formula
-        # RANK(value, range, order) where order: 0=desc, 1=asc
-        order = 1 if ascending else 0
-        formula = f"=RANK(B2,$B$2:$B$100,{order})"
+        # Generate Excel formula using FormulaGenerator
+        formula_gen = FormulaGenerator(request.sheet_name)
+        column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
+        
+        # Find rank column index
+        rank_col_idx = column_indices.get(request.rank_column)
+        if rank_col_idx is not None:
+            col_letter = formula_gen._column_letter(rank_col_idx)
+            # RANK(value, range, order) where order: 0=desc, 1=asc
+            order = 1 if ascending else 0
+            # Use actual row count for range
+            last_row = len(df) + 1  # +1 because Excel is 1-based and we have header
+            formula = f"=RANK({col_letter}2,${col_letter}$2:${col_letter}${last_row},{order})"
+        else:
+            formula = None
 
         return RankRowsResponse(
             rows=rows,
@@ -259,15 +270,15 @@ class AdvancedOperations:
         for col in used_columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-        # Build safe expression for pandas eval
-        # Replace column names with df['column_name'] syntax
+        # Build safe expression for pandas.eval()
+        # Backtick-quote column names to handle spaces and special chars
         safe_expr = request.expression
         for col in sorted(used_columns, key=len, reverse=True):  # Sort by length to avoid partial replacements
-            safe_expr = safe_expr.replace(col, f"df['{col}']")
+            safe_expr = safe_expr.replace(col, f"`{col}`")
 
         try:
-            # Evaluate expression using pandas eval (safe for arithmetic)
-            df[request.output_column_name] = eval(safe_expr)
+            # Use pandas.eval() which is safe for arithmetic expressions
+            df[request.output_column_name] = df.eval(safe_expr)
         except Exception as e:
             raise ValueError(
                 f"Failed to evaluate expression '{request.expression}': {str(e)}"
@@ -287,14 +298,16 @@ class AdvancedOperations:
         tsv_rows = [[row[col] for col in result_columns] for row in rows]
         tsv = self._tsv_formatter.format_table(headers, tsv_rows)
 
-        # Generate Excel formula
+        # Generate Excel formula using FormulaGenerator
+        formula_gen = FormulaGenerator(request.sheet_name)
+        column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
+        
         # Convert expression to Excel formula syntax
         excel_formula = request.expression
-        for col in used_columns:
-            # Find column index (assuming columns are A, B, C, ...)
-            if col in df.columns:
-                col_idx = list(df.columns).index(col)
-                col_letter = chr(65 + col_idx)  # A=65, B=66, etc.
+        for col in sorted(used_columns, key=len, reverse=True):
+            if col in column_indices:
+                col_idx = column_indices[col]
+                col_letter = formula_gen._column_letter(col_idx)
                 excel_formula = excel_formula.replace(col, f"{col_letter}2")
         
         formula = f"={excel_formula}"
