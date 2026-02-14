@@ -35,10 +35,13 @@ from mcp_excel.models.requests import (
     GroupByRequest,
     InspectFileRequest,
     SearchAcrossSheetsRequest,
+    FindDuplicatesRequest,
+    FindNullsRequest,
 )
 from mcp_excel.operations.data_operations import DataOperations
 from mcp_excel.operations.inspection import InspectionOperations
 from mcp_excel.operations.statistics import StatisticsOperations
+from mcp_excel.operations.validation import ValidationOperations
 
 
 def print_section(title: str) -> None:
@@ -969,6 +972,129 @@ def test_multisheet_operations(file_path: str) -> None:
         print(f"  ⚠️ Skipped: Need at least 2 sheets (found {len(sheet_names)})")
 
 
+def test_validation_operations(file_path: str) -> None:
+    """Test data validation operations."""
+    print_section("Testing Validation Operations (Block 5)")
+
+    loader = FileLoader()
+    ops = ValidationOperations(loader)
+
+    # Get sheet names
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info for column names
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in sheet")
+        return
+
+    print(f"\n📋 Available columns: {', '.join(sheet_info.column_names[:5])}...")
+
+    # Test 1: find_duplicates
+    print(f"\n\n🔍 Test 1: Finding duplicates in first column...")
+    try:
+        first_column = sheet_info.column_names[0]
+        print(f"  Checking column: '{first_column}'")
+        
+        request = FindDuplicatesRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            columns=[first_column]
+        )
+        response = ops.find_duplicates(request)
+        
+        print(f"  ✅ Duplicates found: {response.duplicate_count}")
+        print(f"  Columns checked: {response.columns_checked}")
+        
+        if response.duplicates:
+            print(f"  Sample duplicates (first 3):")
+            for idx, dup in enumerate(response.duplicates[:3], 1):
+                # Show first 3 fields
+                dup_preview = dict(list(dup.items())[:3])
+                print(f"    Duplicate {idx}: {dup_preview}")
+            
+            print(f"\n  📋 TSV Output (first 200 chars):")
+            print(f"    {response.excel_output.tsv[:200]}...")
+        else:
+            print(f"  ℹ️ No duplicates found")
+        
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 2: find_duplicates with multiple columns
+    if len(sheet_info.column_names) >= 2:
+        print(f"\n\n🔍 Test 2: Finding duplicates using multiple columns...")
+        try:
+            check_columns = sheet_info.column_names[:2]
+            print(f"  Checking columns: {check_columns}")
+            
+            request = FindDuplicatesRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                columns=check_columns
+            )
+            response = ops.find_duplicates(request)
+            
+            print(f"  ✅ Duplicates found: {response.duplicate_count}")
+            
+            if response.duplicates:
+                print(f"  Sample duplicates (first 2):")
+                for idx, dup in enumerate(response.duplicates[:2], 1):
+                    dup_preview = dict(list(dup.items())[:4])
+                    print(f"    Duplicate {idx}: {dup_preview}")
+            else:
+                print(f"  ℹ️ No duplicates found")
+            
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+    else:
+        print(f"\n\n🔍 Test 2: Finding duplicates using multiple columns...")
+        print(f"  ⚠️ Skipped: Need at least 2 columns")
+
+    # Test 3: find_nulls
+    print(f"\n\n🔎 Test 3: Finding null values in all columns...")
+    try:
+        # Check first 3 columns for nulls
+        check_columns = sheet_info.column_names[:min(3, len(sheet_info.column_names))]
+        print(f"  Checking columns: {check_columns}")
+        
+        request = FindNullsRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            columns=check_columns
+        )
+        response = ops.find_nulls(request)
+        
+        print(f"  ✅ Total nulls found: {response.total_nulls}")
+        print(f"  Columns checked: {response.columns_checked}")
+        
+        print(f"\n  Null statistics per column:")
+        for col, info in response.null_info.items():
+            print(f"    {col}:")
+            print(f"      Null count: {info['null_count']}")
+            print(f"      Percentage: {info['null_percentage']}%")
+            if info['null_count'] > 0 and info['null_indices']:
+                indices_preview = info['null_indices'][:5]
+                print(f"      Sample indices: {indices_preview}...")
+        
+        print(f"\n  📋 TSV Output (first 200 chars):")
+        print(f"    {response.excel_output.tsv[:200]}...")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+
 def main() -> None:
     """Main test function."""
     print("\n" + "=" * 80)
@@ -1009,6 +1135,7 @@ def main() -> None:
         test_aggregation_operations(file_path)
         test_statistics_operations(file_path)
         test_multisheet_operations(file_path)
+        test_validation_operations(file_path)
 
         # This test should be at the very end for ease of copying and pasting
         test_formula_generation(file_path)

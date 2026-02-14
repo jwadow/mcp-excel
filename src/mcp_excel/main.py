@@ -22,6 +22,8 @@ from .models.requests import (
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
     FindColumnRequest,
+    FindDuplicatesRequest,
+    FindNullsRequest,
     GetColumnNamesRequest,
     GetColumnStatsRequest,
     GetSheetInfoRequest,
@@ -34,6 +36,7 @@ from .models.requests import (
 from .operations.data_operations import DataOperations
 from .operations.inspection import InspectionOperations
 from .operations.statistics import StatisticsOperations
+from .operations.validation import ValidationOperations
 
 # Configure logging
 logging.basicConfig(
@@ -53,6 +56,7 @@ class MCPExcelServer:
         self.inspection_ops = InspectionOperations(self.file_loader)
         self.data_ops = DataOperations(self.file_loader)
         self.stats_ops = StatisticsOperations(self.file_loader)
+        self.validation_ops = ValidationOperations(self.file_loader)
 
         # Register handlers
         self._register_handlers()
@@ -641,6 +645,60 @@ class MCPExcelServer:
                         "required": ["file_path", "sheet1", "sheet2", "key_column", "compare_columns"],
                     },
                 ),
+                Tool(
+                    name="find_duplicates",
+                    description="Find duplicate rows based on specified columns. Returns all duplicate rows including first occurrence.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to check for duplicates (checks combination of these columns)",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "columns"],
+                    },
+                ),
+                Tool(
+                    name="find_nulls",
+                    description="Find null/empty values in specified columns. Returns statistics and row indices for each column.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to check for null values",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "columns"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -722,6 +780,16 @@ class MCPExcelServer:
                 elif name == "compare_sheets":
                     request = CompareSheetsRequest(**arguments)
                     response = self.inspection_ops.compare_sheets(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "find_duplicates":
+                    request = FindDuplicatesRequest(**arguments)
+                    response = self.validation_ops.find_duplicates(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "find_nulls":
+                    request = FindNullsRequest(**arguments)
+                    response = self.validation_ops.find_nulls(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 else:

@@ -455,6 +455,47 @@ Detect outliers in a column using IQR or Z-score method.
 - Method and threshold used
 - TSV output for Excel
 
+### 16. `find_duplicates`
+
+Find duplicate rows based on specified columns.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "columns": ["Customer", "Date"]
+}
+```
+
+**Output:**
+- List of duplicate rows (all occurrences including first)
+- Duplicate count
+- Columns checked
+- TSV output for Excel
+- Row indices for each duplicate
+
+**Note:** Uses `duplicated(keep=False)` to mark all duplicates including first occurrence.
+
+### 17. `find_nulls`
+
+Find null/empty values in specified columns with detailed statistics.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "columns": ["Customer", "Amount", "Date"]
+}
+```
+
+**Output:**
+- Null statistics per column (count, percentage, indices)
+- Total null count across all checked columns
+- TSV output for Excel
+- First 100 null indices per column
+
 ## Architecture
 
 ```
@@ -530,10 +571,9 @@ poetry run mypy src/
 - ✅ Cross-sheet value search (search_across_sheets)
 - ✅ Sheet comparison (compare_sheets)
 
-### Phase 4: Data Validation (Planned)
-- ⏳ Find duplicates
-- ⏳ Find null values
-- ⏳ Data quality checks
+### Phase 4: Data Validation ✅ COMPLETED
+- ✅ Find duplicates (find_duplicates)
+- ✅ Find null values (find_nulls)
 
 ### Phase 5: Future Enhancements
 - ⏳ Write operations (xlsx only)
