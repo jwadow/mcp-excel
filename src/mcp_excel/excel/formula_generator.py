@@ -315,7 +315,30 @@ class FormulaGenerator:
         # Null operators: is_null, is_not_null
         elif operator == "is_null":
             if operation == "count":
-                return f"=COUNTBLANK({criteria_range})"
+                # BUG: Excel formula generation not supported for is_null operator
+                #
+                # PROBLEM:
+                # - COUNTBLANK($A:$A) counts ALL empty cells in entire column (65536 rows in .xls, 1M+ in .xlsx)
+                # - COUNTIF($A:$A,"") also counts ALL empty cells in entire column
+                # - Python counts only empty cells in loaded data (e.g., 120 rows)
+                # - Result: Excel returns 65416, Python returns 0 - massive discrepancy
+                #
+                # ROOT CAUSE:
+                # - Full column references ($A:$A) include all rows in Excel sheet
+                # - Excel cannot distinguish "empty cells in data" from "empty cells beyond data"
+                # - Pandas loads only actual data rows, ignoring empty rows beyond data
+                #
+                # CORRECT SOLUTION:
+                # - Use specific range instead of full column: $A$4:$A$123 (based on actual data boundaries)
+                # - Requires DataRange with start_row/end_row calculated from len(df) + header_row
+                # - Would need to pass DataRange to FormulaGenerator and use it ONLY for is_null
+                #
+                # CURRENT DECISION:
+                # - Do not generate formula (return None)
+                # - Python result is correct and will be used by agent
+                # - Pragmatic approach: avoid complex fix for single edge case operator
+                # - If formulas become critical, implement DataRange solution
+                return None
             else:
                 return "=NA()  // 'is_null' with sum/mean not supported"
         
