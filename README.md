@@ -65,8 +65,6 @@ pip install -e .
 
 ## Configuration
 
-⚠️ **Important:** This is an MCP server. It runs automatically when your AI agent needs it. Do not run it manually in terminal.
-
 ### Supported AI Agents
 
 Works with any MCP-compatible AI agent: *Claude Code, OpenCode, Codex app, Cursor, Cline, Roo Code, Kilo Code*
@@ -91,6 +89,16 @@ Works with any MCP-compatible AI agent: *Claude Code, OpenCode, Codex app, Curso
   }
 }
 ```
+
+**Manual start for other MCP clients**
+
+The server uses STDIO transport by default. Start it manually with:
+
+```bash
+poetry run python -m mcp_excel.main
+```
+
+⚠️ **Important:** This is an MCP server. It runs automatically when your AI agent needs it. Do not run it manually in terminal.
 
 ## Usage
 
@@ -128,74 +136,6 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 ```
 
 **Important:** Replace `C:/Users/YourName/Documents/data.xlsx` with the actual path to your Excel file.
-
-### What the manual test does:
-
-1. **FileLoader Test**: Loads file, shows structure, demonstrates caching
-2. **HeaderDetector Test**: Automatically detects header row in messy files
-3. **InspectionOperations Test**: Shows file inspection and sheet analysis
-4. **DataOperations Test**: Tests filtering, unique values, and data retrieval (5 tests)
-5. **AggregationOperations Test**: Tests aggregation and group-by operations (6 tests)
-
-### Example Output:
-
-```
-================================================================================
-  Testing FileLoader
-================================================================================
-
-📁 File Information:
-{
-  "format": "xlsx",
-  "size_mb": 2.45,
-  "sheet_count": 3,
-  "sheet_names": ["Sales", "Inventory", "Archive"]
-}
-
-📋 Sheet Names:
-  1. Sales
-  2. Inventory
-  3. Archive
-
-📊 Loading first sheet: Sales
-  Rows: 1523
-  Columns: 12
-  Column names: ['Date', 'Customer', 'Product', 'Quantity', 'Price', ...]
-
-💾 Cache Statistics:
-{
-  "size": 1,
-  "max_size": 5,
-  "memory_mb": 145.2,
-  "idle_seconds": 0.5
-}
-```
-
-## Running as MCP Server
-
-### Configuration for Claude Desktop
-
-Add to your Claude Desktop config (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "excel": {
-      "command": "python",
-      "args": ["-m", "mcp_excel.main"],
-      "cwd": "/path/to/mcp-excel"
-    }
-  }
-}
-```
-
-### Configuration for Other MCP Clients
-
-The server uses STDIO transport by default. Start it with:
-
-```bash
-poetry run python -m mcp_excel.main
-```
 
 ## Available Tools
 
