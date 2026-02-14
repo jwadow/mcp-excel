@@ -20,6 +20,7 @@ from .models.requests import (
     DetectOutliersRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
+    FindColumnRequest,
     GetColumnNamesRequest,
     GetColumnStatsRequest,
     GetSheetInfoRequest,
@@ -117,6 +118,29 @@ class MCPExcelServer:
                             },
                         },
                         "required": ["file_path", "sheet_name"],
+                    },
+                ),
+                Tool(
+                    name="find_column",
+                    description="Find a column across all sheets or in the first sheet. Returns list of sheets where the column was found with metadata.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "column_name": {
+                                "type": "string",
+                                "description": "Column name to search for (case-insensitive)",
+                            },
+                            "search_all_sheets": {
+                                "type": "boolean",
+                                "description": "Search in all sheets (true) or just first sheet (false). Default: true",
+                                "default": True,
+                            },
+                        },
+                        "required": ["file_path", "column_name"],
                     },
                 ),
                 Tool(
@@ -580,6 +604,11 @@ class MCPExcelServer:
                 elif name == "get_column_names":
                     request = GetColumnNamesRequest(**arguments)
                     response = self.inspection_ops.get_column_names(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "find_column":
+                    request = FindColumnRequest(**arguments)
+                    response = self.inspection_ops.find_column(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 elif name == "get_unique_values":
