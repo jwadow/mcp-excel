@@ -16,6 +16,7 @@ from mcp.types import Tool, TextContent
 from .core.file_loader import FileLoader
 from .models.requests import (
     AggregateRequest,
+    CompareSheetsRequest,
     CorrelateRequest,
     DetectOutliersRequest,
     FilterAndCountRequest,
@@ -28,6 +29,7 @@ from .models.requests import (
     GetValueCountsRequest,
     GroupByRequest,
     InspectFileRequest,
+    SearchAcrossSheetsRequest,
 )
 from .operations.data_operations import DataOperations
 from .operations.inspection import InspectionOperations
@@ -583,6 +585,62 @@ class MCPExcelServer:
                         "required": ["file_path", "sheet_name", "column"],
                     },
                 ),
+                Tool(
+                    name="search_across_sheets",
+                    description="Search for a value across all sheets in the file. Returns list of sheets with match counts.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "column_name": {
+                                "type": "string",
+                                "description": "Column name to search in (case-insensitive)",
+                            },
+                            "value": {
+                                "description": "Value to search for (supports numbers and strings)",
+                            },
+                        },
+                        "required": ["file_path", "column_name", "value"],
+                    },
+                ),
+                Tool(
+                    name="compare_sheets",
+                    description="Compare data between two sheets using a key column. Returns rows with differences.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet1": {
+                                "type": "string",
+                                "description": "First sheet name to compare",
+                            },
+                            "sheet2": {
+                                "type": "string",
+                                "description": "Second sheet name to compare",
+                            },
+                            "key_column": {
+                                "type": "string",
+                                "description": "Column to use as key for matching rows between sheets",
+                            },
+                            "compare_columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to compare for differences",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet1", "sheet2", "key_column", "compare_columns"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -654,6 +712,16 @@ class MCPExcelServer:
                 elif name == "detect_outliers":
                     request = DetectOutliersRequest(**arguments)
                     response = self.stats_ops.detect_outliers(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "search_across_sheets":
+                    request = SearchAcrossSheetsRequest(**arguments)
+                    response = self.inspection_ops.search_across_sheets(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "compare_sheets":
+                    request = CompareSheetsRequest(**arguments)
+                    response = self.inspection_ops.compare_sheets(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 else:

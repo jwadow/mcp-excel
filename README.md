@@ -337,6 +337,124 @@ Group data by columns and perform aggregation (like Excel Pivot Table).
 - TSV output for Excel
 - Supports multiple grouping columns
 
+### 10. `find_column`
+
+Find a column across all sheets or in a specific sheet.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "column_name": "Customer",
+  "search_all_sheets": true
+}
+```
+
+**Output:**
+- List of sheets where column was found
+- Column index and row count for each match
+- Case-insensitive search
+
+### 11. `search_across_sheets`
+
+Search for a specific value across all sheets in the file.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "column_name": "Customer",
+  "value": "Acme Corp"
+}
+```
+
+**Output:**
+- List of sheets with matches
+- Match count per sheet
+- Total matches across all sheets
+- Supports both numeric and string values
+
+### 12. `compare_sheets`
+
+Compare data between two sheets using a key column.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet1": "January",
+  "sheet2": "February",
+  "key_column": "Customer",
+  "compare_columns": ["Amount", "Quantity"]
+}
+```
+
+**Output:**
+- Rows with differences
+- Status for each row (only_in_sheet1, only_in_sheet2, different_values)
+- Side-by-side comparison of values
+- TSV output for Excel
+
+### 13. `get_column_stats`
+
+Get statistical summary of a column.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "column": "Amount"
+}
+```
+
+**Output:**
+- Count, mean, median, std, min, max
+- Quartiles (25th, 75th percentile)
+- Null count
+- TSV output for Excel
+
+### 14. `correlate`
+
+Calculate correlation matrix between multiple columns.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "columns": ["Amount", "Quantity", "Discount"],
+  "method": "pearson"
+}
+```
+
+**Output:**
+- Correlation matrix
+- Supports pearson, spearman, kendall methods
+- Works with 2+ columns
+- TSV output for Excel
+
+### 15. `detect_outliers`
+
+Detect outliers in a column using IQR or Z-score method.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "column": "Amount",
+  "method": "iqr",
+  "threshold": 1.5
+}
+```
+
+**Output:**
+- List of rows with outliers
+- Outlier count
+- Method and threshold used
+- TSV output for Excel
+
 ## Architecture
 
 ```
@@ -401,18 +519,23 @@ poetry run mypy src/
 - ✅ Data retrieval with pagination
 - ✅ Unique values and frequency analysis
 
-### Phase 2: Advanced Analytics (In Progress)
+### Phase 2: Advanced Analytics ✅ COMPLETED
 - ✅ Group-by operations
-- ⏳ Statistical analysis (get_column_stats)
-- ⏳ Correlation analysis
-- ⏳ Outlier detection
+- ✅ Statistical analysis (get_column_stats)
+- ✅ Correlation analysis (correlate)
+- ✅ Outlier detection (detect_outliers)
 
-### Phase 3: Multi-Sheet Operations
-- ⏳ Cross-sheet search
-- ⏳ Sheet comparison
-- ⏳ Data validation
+### Phase 3: Multi-Sheet Operations ✅ COMPLETED
+- ✅ Cross-sheet column search (find_column)
+- ✅ Cross-sheet value search (search_across_sheets)
+- ✅ Sheet comparison (compare_sheets)
 
-### Phase 4: Future Enhancements
+### Phase 4: Data Validation (Planned)
+- ⏳ Find duplicates
+- ⏳ Find null values
+- ⏳ Data quality checks
+
+### Phase 5: Future Enhancements
 - ⏳ Write operations (xlsx only)
 - ⏳ CSV support
 - ⏳ SSE transport mode

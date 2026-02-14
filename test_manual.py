@@ -20,11 +20,13 @@ from mcp_excel.core.file_loader import FileLoader
 from mcp_excel.core.header_detector import HeaderDetector
 from mcp_excel.models.requests import (
     AggregateRequest,
+    CompareSheetsRequest,
     CorrelateRequest,
     DetectOutliersRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
     FilterCondition,
+    FindColumnRequest,
     GetColumnNamesRequest,
     GetColumnStatsRequest,
     GetSheetInfoRequest,
@@ -32,6 +34,7 @@ from mcp_excel.models.requests import (
     GetValueCountsRequest,
     GroupByRequest,
     InspectFileRequest,
+    SearchAcrossSheetsRequest,
 )
 from mcp_excel.operations.data_operations import DataOperations
 from mcp_excel.operations.inspection import InspectionOperations
@@ -833,6 +836,139 @@ def test_statistics_operations(file_path: str) -> None:
         print(f"  ❌ Error: {e}")
 
 
+def test_multisheet_operations(file_path: str) -> None:
+    """Test multi-sheet operations."""
+    print_section("Testing Multi-Sheet Operations (Block 4)")
+
+    loader = FileLoader()
+    ops = InspectionOperations(loader)
+
+    # Get sheet names
+    sheet_names = loader.get_sheet_names(file_path)
+    if len(sheet_names) < 1:
+        print("❌ No sheets found in file")
+        return
+
+    print(f"📊 File has {len(sheet_names)} sheet(s): {', '.join(sheet_names)}")
+
+    # Get first sheet info for column names
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_names[0])
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in first sheet")
+        return
+
+    first_column = sheet_info.column_names[0]
+    print(f"\n📋 Using column '{first_column}' for tests")
+
+    # Test 1: find_column
+    print(f"\n\n🔍 Test 1: Finding column '{first_column}' across all sheets...")
+    try:
+        request = FindColumnRequest(
+            file_path=file_path,
+            column_name=first_column,
+            search_all_sheets=True
+        )
+        response = ops.find_column(request)
+        
+        print(f"  ✅ Found in {response.total_matches} location(s)")
+        for match in response.found_in:
+            print(f"    Sheet: {match['sheet']}, Column: {match['column_name']}, Index: {match['column_index']}, Rows: {match['row_count']}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 2: search_across_sheets
+    print(f"\n\n🔎 Test 2: Searching for a value across all sheets...")
+    try:
+        # Get a sample value from first column
+        data_ops = DataOperations(loader)
+        unique_request = GetUniqueValuesRequest(
+            file_path=file_path,
+            sheet_name=sheet_names[0],
+            column=first_column,
+            limit=1
+        )
+        unique_response = data_ops.get_unique_values(unique_request)
+        
+        if unique_response.values:
+            search_value = unique_response.values[0]
+            print(f"  Searching for value: '{search_value}' in column '{first_column}'")
+            
+            request = SearchAcrossSheetsRequest(
+                file_path=file_path,
+                column_name=first_column,
+                value=search_value
+            )
+            response = ops.search_across_sheets(request)
+            
+            print(f"  ✅ Total matches: {response.total_matches}")
+            print(f"  Found in {len(response.matches)} sheet(s):")
+            for match in response.matches:
+                print(f"    Sheet: {match['sheet']}, Matches: {match['match_count']}/{match['total_rows']} rows")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        else:
+            print(f"  ⚠️ No values found to search for")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 3: compare_sheets (only if we have 2+ sheets)
+    if len(sheet_names) >= 2:
+        print(f"\n\n⚖️ Test 3: Comparing sheets '{sheet_names[0]}' and '{sheet_names[1]}'...")
+        try:
+            # Get columns from both sheets
+            sheet1_info = inspection_ops.get_sheet_info(
+                GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_names[0])
+            )
+            sheet2_info = inspection_ops.get_sheet_info(
+                GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_names[1])
+            )
+            
+            # Find common columns
+            common_columns = set(sheet1_info.column_names) & set(sheet2_info.column_names)
+            
+            if len(common_columns) >= 2:
+                common_list = list(common_columns)
+                key_column = common_list[0]
+                compare_columns = common_list[1:min(3, len(common_list))]  # Compare up to 2 columns
+                
+                print(f"  Key column: '{key_column}'")
+                print(f"  Comparing columns: {compare_columns}")
+                
+                request = CompareSheetsRequest(
+                    file_path=file_path,
+                    sheet1=sheet_names[0],
+                    sheet2=sheet_names[1],
+                    key_column=key_column,
+                    compare_columns=compare_columns
+                )
+                response = ops.compare_sheets(request)
+                
+                print(f"  ✅ Differences found: {response.difference_count}")
+                if response.differences:
+                    print(f"  Sample differences (first 3):")
+                    for idx, diff in enumerate(response.differences[:3], 1):
+                        status = diff.get('status', 'unknown')
+                        key_val = diff.get(key_column, 'N/A')
+                        print(f"    Diff {idx}: {key_val} - {status}")
+                    
+                    print(f"\n  📋 TSV Output (first 200 chars):")
+                    print(f"    {response.excel_output.tsv[:200]}...")
+                else:
+                    print(f"  ℹ️ No differences found - sheets are identical")
+                
+                print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+            else:
+                print(f"  ⚠️ Not enough common columns between sheets (found {len(common_columns)})")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+    else:
+        print(f"\n\n⚖️ Test 3: Comparing sheets...")
+        print(f"  ⚠️ Skipped: Need at least 2 sheets (found {len(sheet_names)})")
+
+
 def main() -> None:
     """Main test function."""
     print("\n" + "=" * 80)
@@ -872,6 +1008,7 @@ def main() -> None:
         test_data_operations(file_path)
         test_aggregation_operations(file_path)
         test_statistics_operations(file_path)
+        test_multisheet_operations(file_path)
 
         # This test should be at the very end for ease of copying and pasting
         test_formula_generation(file_path)

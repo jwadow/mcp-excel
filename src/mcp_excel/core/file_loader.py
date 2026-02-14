@@ -88,7 +88,9 @@ class FileLoader:
         # Try cache first
         if use_cache:
             sheet_key = str(sheet_name) if sheet_name is not None else "0"
-            cached_df = self._cache.get(path, sheet_key)
+            # Include header_row in cache key to avoid returning wrong data
+            cache_key = f"{sheet_key}::header_{header_row}"
+            cached_df = self._cache.get(path, cache_key)
             if cached_df is not None:
                 return cached_df
 
@@ -108,7 +110,8 @@ class FileLoader:
             # Cache the result
             if use_cache:
                 sheet_key = str(sheet_name) if sheet_name is not None else "0"
-                self._cache.put(path, df, sheet_key)
+                cache_key = f"{sheet_key}::header_{header_row}"
+                self._cache.put(path, df, cache_key)
 
             return df
 
