@@ -54,17 +54,25 @@ class DataOperations:
     def _format_value(self, value: Any) -> Any:
         """Format value for natural display to agent/user.
         
-        Converts floats without decimal parts to ints for natural representation.
-        Example: 50089416.0 -> 50089416 (matches Excel display)
+        Converts values to JSON-serializable types:
+        - Floats without decimal parts -> ints (50089416.0 -> 50089416)
+        - Datetime values -> ISO 8601 strings (per DATE_TIME_ARCHITECTURE.md)
+        - NaN/NaT -> None
         
         Args:
             value: Value to format
             
         Returns:
-            Formatted value
+            Formatted value (JSON-serializable)
         """
         if pd.isna(value):
             return None
+        elif isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
+            # Convert datetime to ISO 8601 string for agent
+            return value.isoformat()
+        elif pd.api.types.is_datetime64_any_dtype(type(value)):
+            # Handle numpy datetime64
+            return pd.Timestamp(value).isoformat()
         elif isinstance(value, float) and value.is_integer():
             return int(value)
         else:
@@ -141,6 +149,33 @@ class DataOperations:
         df.columns = [str(col) for col in df.columns]
         
         return df
+    
+    def _get_column_types(self, df: pd.DataFrame) -> dict[str, str]:
+        """Get types of all columns in DataFrame.
+        
+        Args:
+            df: DataFrame to analyze
+            
+        Returns:
+            Dictionary mapping column names to type strings
+        """
+        column_types = {}
+        
+        for col in df.columns:
+            col_str = str(col)
+            
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                column_types[col_str] = "datetime"
+            elif pd.api.types.is_integer_dtype(df[col]):
+                column_types[col_str] = "integer"
+            elif pd.api.types.is_float_dtype(df[col]):
+                column_types[col_str] = "float"
+            elif pd.api.types.is_bool_dtype(df[col]):
+                column_types[col_str] = "boolean"
+            else:
+                column_types[col_str] = "string"
+        
+        return column_types
 
     def get_unique_values(
         self, request: GetUniqueValuesRequest
@@ -276,6 +311,9 @@ class DataOperations:
         # Generate Excel formula
         formula_gen = FormulaGenerator(request.sheet_name)
         
+        # Get column types for datetime handling in formulas
+        column_types = self._get_column_types(df)
+        
         # Build column ranges for formula generation
         column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
         column_ranges = {}
@@ -291,6 +329,7 @@ class DataOperations:
                 operation="count",
                 filters=request.filters,
                 column_ranges=column_ranges,
+                column_types=column_types,
             )
         except ValueError:
             # Complex filter not supported in formula
@@ -490,6 +529,9 @@ class DataOperations:
         formula_gen = FormulaGenerator(request.sheet_name)
         column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
         
+        # Get column types for datetime handling in formulas
+        column_types = self._get_column_types(df)
+        
         # Build column ranges
         column_ranges = {}
         if request.filters:
@@ -513,6 +555,7 @@ class DataOperations:
                 filters=request.filters,
                 column_ranges=column_ranges,
                 target_range=target_range,
+                column_types=column_types,
             )
         except ValueError:
             # Complex filter not supported in formula

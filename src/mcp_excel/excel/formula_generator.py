@@ -7,6 +7,8 @@
 
 from typing import Any, Optional
 
+import pandas as pd
+
 from ..models.requests import FilterCondition
 
 
@@ -44,7 +46,10 @@ class FormulaGenerator:
         Returns:
             Escaped value as string
         """
-        if isinstance(value, str):
+        if isinstance(value, pd.Timestamp):
+            # Format datetime as DATE() function
+            return self._format_date_for_excel(value)
+        elif isinstance(value, str):
             # Escape quotes and protect from formula injection
             escaped = value.replace('"', '""')
             if escaped.startswith(("=", "+", "-", "@")):
@@ -54,6 +59,84 @@ class FormulaGenerator:
             return '""'
         else:
             return str(value)
+    
+    def _format_date_for_excel(self, dt: pd.Timestamp) -> str:
+        """Format datetime as Excel DATE() function.
+        
+        Args:
+            dt: Pandas Timestamp
+        
+        Returns:
+            Excel DATE() function string
+        """
+        if pd.isna(dt):
+            return '""'
+        
+        # Excel DATE(year, month, day) function
+        return f"DATE({dt.year},{dt.month},{dt.day})"
+    
+    def _convert_datetime_filters(
+        self,
+        filters: list[FilterCondition],
+        column_types: dict[str, str]
+    ) -> list[FilterCondition]:
+        """Convert string datetime values in filters to pd.Timestamp.
+        
+        This ensures that datetime filter values are properly formatted as
+        DATE() functions in Excel formulas.
+        
+        Args:
+            filters: List of filter conditions
+            column_types: Mapping of column names to types
+        
+        Returns:
+            List of filters with datetime values converted to pd.Timestamp
+        """
+        converted_filters = []
+        
+        for filter_cond in filters:
+            # Check if this column is a datetime type
+            col_type = column_types.get(filter_cond.column)
+            
+            if col_type == "datetime":
+                # Convert string datetime values to pd.Timestamp
+                if isinstance(filter_cond.value, str):
+                    try:
+                        # Parse ISO 8601 string to Timestamp
+                        converted_value = pd.to_datetime(filter_cond.value)
+                        # Create new filter with converted value
+                        filter_cond = FilterCondition(
+                            column=filter_cond.column,
+                            operator=filter_cond.operator,
+                            value=converted_value,
+                            values=filter_cond.values
+                        )
+                    except Exception:
+                        # If conversion fails, keep original value
+                        pass
+                
+                # Also convert values list if present (for 'in' operator)
+                if filter_cond.values:
+                    converted_values = []
+                    for val in filter_cond.values:
+                        if isinstance(val, str):
+                            try:
+                                converted_values.append(pd.to_datetime(val))
+                            except Exception:
+                                converted_values.append(val)
+                        else:
+                            converted_values.append(val)
+                    
+                    filter_cond = FilterCondition(
+                        column=filter_cond.column,
+                        operator=filter_cond.operator,
+                        value=filter_cond.value,
+                        values=converted_values
+                    )
+            
+            converted_filters.append(filter_cond)
+        
+        return converted_filters
 
     def _column_letter(self, col_index: int) -> str:
         """Convert column index to Excel letter.
@@ -179,6 +262,7 @@ class FormulaGenerator:
         filters: list[FilterCondition],
         column_ranges: dict[str, str],
         target_range: Optional[str] = None,
+        column_types: Optional[dict[str, str]] = None,
     ) -> str:
         """Generate formula from filter conditions.
 
@@ -187,6 +271,7 @@ class FormulaGenerator:
             filters: List of filter conditions
             column_ranges: Mapping of column names to Excel ranges
             target_range: Target range for aggregation (required for sum/mean)
+            column_types: Optional mapping of column names to types (for datetime handling)
 
         Returns:
             Excel formula
@@ -194,6 +279,10 @@ class FormulaGenerator:
         Raises:
             ValueError: If operation is not supported or parameters are invalid
         """
+        # Convert datetime filter values if column types are provided
+        if column_types:
+            filters = self._convert_datetime_filters(filters, column_types)
+        
         if not filters:
             # No filters - simple aggregation
             if operation == "count" and target_range:
@@ -407,7 +496,20 @@ class FormulaGenerator:
             != with "text" → "<>text"
             > with 10 → ">10"
             >= with 10 → ">=10"
+            >= with date → ">="&DATE(2026,1,1)
         """
+        # Handle datetime values specially
+        if isinstance(value, pd.Timestamp):
+            date_func = self._format_date_for_excel(value)
+            if operator == "==":
+                return date_func
+            elif operator in [">", "<", ">=", "<=", "!="]:
+                # For comparison operators with dates, use: ">="&DATE(...)
+                excel_op = "<>" if operator == "!=" else operator
+                return f'"{excel_op}"&{date_func}'
+            else:
+                return date_func
+        
         if operator == "==":
             # Simple equality
             return self._escape_value(value)

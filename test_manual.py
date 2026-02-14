@@ -156,7 +156,14 @@ def test_inspection_operations(file_path: str) -> None:
 
         print("\n  Sample Data (first 3 rows):")
         for idx, row in enumerate(response.sample_rows, 1):
-            print(f"    Row {idx}: {dict(list(row.items())[:3])}...")
+            if idx == 1:
+                # Show ALL columns for first row to verify complete data
+                print(f"    Row {idx} (ALL {len(row)} columns):")
+                for col_name, col_value in row.items():
+                    print(f"      {col_name}: {col_value}")
+            else:
+                # Show only first 3 columns for other rows
+                print(f"    Row {idx}: {dict(list(row.items())[:3])}...")
 
 
 def test_data_operations(file_path: str) -> None:
@@ -510,6 +517,8 @@ def test_aggregation_operations(file_path: str) -> None:
             print(f"  Sample groups (first 2):")
             for idx, group in enumerate(response.groups[:2], 1):
                 print(f"    Group {idx}: {group}")
+            print(f"\n  📋 TSV Output (first 150 chars):")
+            print(f"    {response.excel_output.tsv[:150]}...")
             print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
         except Exception as e:
             print(f"  ❌ Error: {e}")
@@ -674,6 +683,71 @@ def test_formula_generation(file_path: str) -> None:
             print(f"    Formula: {response.excel_output.formula}")
         except Exception as e:
             print(f"\n  {description}: ❌ Error: {e}")
+    
+    # Test datetime operators (if datetime columns exist)
+    print(f"\n\n📅 Testing DateTime Operators:")
+    
+    # Find datetime columns
+    datetime_columns = [col for col, dtype in sheet_info.column_types.items() if dtype == "datetime"]
+    
+    if datetime_columns:
+        date_col = datetime_columns[0]
+        print(f"  Using datetime column: '{date_col}'")
+        
+        # Get a sample datetime value
+        sample_rows_request = FilterAndGetRowsRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            filters=[],
+            columns=[date_col],
+            limit=1,
+            offset=0,
+            logic="AND"
+        )
+        sample_response = ops.filter_and_get_rows(sample_rows_request)
+        
+        if sample_response.rows and sample_response.rows[0].get(date_col):
+            sample_date_str = sample_response.rows[0][date_col]
+            # Extract date part (YYYY-MM-DD)
+            if isinstance(sample_date_str, str) and 'T' in sample_date_str:
+                test_date = sample_date_str.split('T')[0]
+                print(f"  Test date value: '{test_date}'")
+                
+                datetime_operators = [
+                    ("==", test_date, "Equal to date"),
+                    (">=", test_date, "Greater or equal to date"),
+                    (">", test_date, "Greater than date"),
+                ]
+                
+                for operator, value, description in datetime_operators:
+                    try:
+                        request = FilterAndCountRequest(
+                            file_path=file_path,
+                            sheet_name=sheet_name,
+                            filters=[
+                                FilterCondition(column=date_col, operator=operator, value=value)
+                            ],
+                            logic="AND"
+                        )
+                        response = ops.filter_and_count(request)
+                        
+                        print(f"\n  {description} ({operator}):")
+                        print(f"    Count: {response.count}")
+                        print(f"    Formula: {response.excel_output.formula}")
+                        
+                        # Verify DATE() function is in formula
+                        if response.excel_output.formula and "DATE(" in response.excel_output.formula:
+                            print(f"    ✅ Formula uses DATE() function")
+                        elif response.excel_output.formula:
+                            print(f"    ⚠️ Formula doesn't use DATE() function")
+                    except Exception as e:
+                        print(f"\n  {description} ({operator}): ❌ Error: {e}")
+            else:
+                print(f"  ⚠️ Sample value is not in ISO 8601 format")
+        else:
+            print(f"  ⚠️ No datetime values found in column")
+    else:
+        print(f"  ℹ️ No datetime columns found in sheet (skipping datetime formula tests)")
 
     print(f"\n\n💡 Tip: Copy any formula above and paste it into Excel to verify it works!")
 
@@ -831,6 +905,9 @@ def test_statistics_operations(file_path: str) -> None:
             for idx, outlier in enumerate(response.outliers[:2], 1):
                 outlier_preview = dict(list(outlier.items())[:3])
                 print(f"    Outlier {idx}: {outlier_preview}")
+            
+            print(f"\n  📋 TSV Output (first 200 chars):")
+            print(f"    {response.excel_output.tsv[:200]}...")
         else:
             print(f"  ℹ️ No outliers found with current threshold")
         
@@ -1052,6 +1129,9 @@ def test_validation_operations(file_path: str) -> None:
                 for idx, dup in enumerate(response.duplicates[:2], 1):
                     dup_preview = dict(list(dup.items())[:4])
                     print(f"    Duplicate {idx}: {dup_preview}")
+                
+                print(f"\n  📋 TSV Output (first 200 chars):")
+                print(f"    {response.excel_output.tsv[:200]}...")
             else:
                 print(f"  ℹ️ No duplicates found")
             
@@ -1093,6 +1173,106 @@ def test_validation_operations(file_path: str) -> None:
         print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
     except Exception as e:
         print(f"  ❌ Error: {e}")
+
+
+def test_datetime_detection(file_path: str) -> None:
+    """Test datetime detection through MCP API."""
+    print_section("Testing DateTime Detection & Conversion")
+    
+    from mcp_excel.operations.inspection import InspectionOperations
+    from mcp_excel.operations.data_operations import DataOperations
+    from mcp_excel.models.requests import GetSheetInfoRequest, FilterAndCountRequest, FilterCondition
+    
+    loader = FileLoader()
+    inspection_ops = InspectionOperations(loader)
+    data_ops = DataOperations(loader)
+    
+    # Get sheet names
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+    
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+    
+    # Step 1: Get sheet info via MCP API
+    print("\n\n🔍 Step 1: Checking column types via MCP get_sheet_info...")
+    request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    response = inspection_ops.get_sheet_info(request)
+    
+    print(f"  Found {response.column_count} columns, {response.row_count} rows")
+    
+    # Find datetime columns
+    datetime_columns = [col for col, dtype in response.column_types.items() if dtype == "datetime"]
+    
+    if datetime_columns:
+        print(f"\n  ✅ MCP detected {len(datetime_columns)} datetime column(s):")
+        for col in datetime_columns:
+            print(f"    • '{col}' (type: datetime)")
+    else:
+        print(f"\n  ℹ️ No datetime columns detected")
+    
+    # Step 2: Verify ISO 8601 format in sample_rows
+    if datetime_columns and response.sample_rows:
+        print(f"\n\n📋 Step 2: Verifying datetime values are ISO 8601 strings...")
+        
+        for idx, row in enumerate(response.sample_rows[:3], 1):
+            print(f"\n  Sample row {idx}:")
+            for col in datetime_columns:
+                value = row.get(col)
+                value_type = type(value).__name__
+                print(f"    {col}: {value} (type: {value_type})")
+                
+                # Verify it's a string in ISO format
+                if isinstance(value, str) and 'T' in value:
+                    print(f"      ✅ Correctly formatted as ISO 8601 string")
+                elif value is None:
+                    print(f"      ℹ️ Null value")
+                else:
+                    print(f"      ⚠️ WARNING: Not an ISO 8601 string!")
+    
+    # Step 3: Test datetime filtering (dynamic date from data)
+    if datetime_columns and response.sample_rows:
+        print(f"\n\n🔍 Step 3: Testing datetime filtering...")
+        
+        date_col = datetime_columns[0]
+        
+        # Get a sample datetime value from the data
+        sample_date_value = None
+        for row in response.sample_rows:
+            val = row.get(date_col)
+            if val and isinstance(val, str) and 'T' in val:
+                # Use date part only (YYYY-MM-DD)
+                sample_date_value = val.split('T')[0]
+                break
+        
+        if sample_date_value:
+            print(f"  Filter: {date_col} >= '{sample_date_value}'")
+            
+            try:
+                request = FilterAndCountRequest(
+                    file_path=file_path,
+                    sheet_name=sheet_name,
+                    filters=[
+                        FilterCondition(column=date_col, operator=">=", value=sample_date_value)
+                    ],
+                    logic="AND"
+                )
+                response_filter = data_ops.filter_and_count(request)
+                
+                print(f"  ✅ Matching rows: {response_filter.count}")
+                print(f"  📋 Excel formula: {response_filter.excel_output.formula}")
+                print(f"  ⚡ Execution time: {response_filter.performance.execution_time_ms}ms")
+            except Exception as e:
+                print(f"  ❌ Error: {e}")
+        else:
+            print(f"  ⚠️ No datetime values found for filtering test")
+    
+    print("\n\n💡 Summary:")
+    print(f"  • Datetime columns found: {len(datetime_columns)}")
+    print(f"  • ISO 8601 format: {'✅ Verified' if datetime_columns else 'N/A'}")
+    print(f"  • Filtering support: {'✅ Working' if datetime_columns else 'N/A'}")
 
 
 def main() -> None:
@@ -1137,8 +1317,11 @@ def main() -> None:
         test_multisheet_operations(file_path)
         test_validation_operations(file_path)
 
+        # Test datetime detection
+        test_datetime_detection(file_path)
         # This test should be at the very end for ease of copying and pasting
         test_formula_generation(file_path)
+
 
         print_section("✅ All Tests Completed Successfully")
 

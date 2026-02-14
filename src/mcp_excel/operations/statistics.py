@@ -46,16 +46,27 @@ class StatisticsOperations:
         self._tsv_formatter = TSVFormatter()
 
     def _format_value(self, value: Any) -> Any:
-        """Format value for natural display.
+        """Format value for natural display to agent/user.
+        
+        Converts values to JSON-serializable types:
+        - Floats without decimal parts -> ints
+        - Datetime values -> ISO 8601 strings (per DATE_TIME_ARCHITECTURE.md)
+        - NaN/NaT -> None
 
         Args:
             value: Value to format
 
         Returns:
-            Formatted value
+            Formatted value (JSON-serializable)
         """
         if pd.isna(value):
             return None
+        elif isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
+            # Convert datetime to ISO 8601 string for agent
+            return value.isoformat()
+        elif pd.api.types.is_datetime64_any_dtype(type(value)):
+            # Handle numpy datetime64
+            return pd.Timestamp(value).isoformat()
         elif isinstance(value, float) and value.is_integer():
             return int(value)
         else:

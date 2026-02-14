@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """Inspection operations for Excel files."""
 
 import time
@@ -190,8 +195,18 @@ class InspectionOperations:
         for idx in range(min(3, len(df))):
             row_dict = df.iloc[idx].to_dict()
             # Convert to JSON-serializable types with string keys
-            row_dict = {str(k): (None if pd.isna(v) else v) for k, v in row_dict.items()}
-            sample_rows.append(row_dict)
+            # CRITICAL: Convert datetime values to ISO 8601 strings for agent
+            serialized_row = {}
+            for k, v in row_dict.items():
+                key = str(k)
+                if pd.isna(v):
+                    serialized_row[key] = None
+                elif pd.api.types.is_datetime64_any_dtype(type(v)) or isinstance(v, pd.Timestamp):
+                    # Convert datetime to ISO 8601 string
+                    serialized_row[key] = v.isoformat()
+                else:
+                    serialized_row[key] = v
+            sample_rows.append(serialized_row)
 
         metadata = self._get_file_metadata(request.file_path, request.sheet_name)
         metadata.rows_total = len(df)

@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """Filtering system for DataFrame operations."""
 
 import re
@@ -6,10 +11,15 @@ from typing import Any
 import pandas as pd
 
 from ..models.requests import FilterCondition
+from ..core.datetime_converter import DateTimeConverter
 
 
 class FilterEngine:
     """Engine for applying filters to DataFrames."""
+    
+    def __init__(self) -> None:
+        """Initialize filter engine."""
+        self._datetime_converter = DateTimeConverter()
 
     def apply_filters(
         self,
@@ -114,30 +124,43 @@ class FilterEngine:
 
         col_data = df[column]
         operator = filter_cond.operator
+        
+        # Parse filter value for datetime columns
+        filter_value = filter_cond.value
+        if pd.api.types.is_datetime64_any_dtype(col_data) and filter_value is not None:
+            filter_value = self._parse_datetime_value(filter_value)
 
         # Comparison operators
         if operator == "==":
-            return col_data == filter_cond.value
+            return col_data == filter_value
         elif operator == "!=":
-            return col_data != filter_cond.value
+            return col_data != filter_value
         elif operator == ">":
-            return col_data > filter_cond.value
+            return col_data > filter_value
         elif operator == "<":
-            return col_data < filter_cond.value
+            return col_data < filter_value
         elif operator == ">=":
-            return col_data >= filter_cond.value
+            return col_data >= filter_value
         elif operator == "<=":
-            return col_data <= filter_cond.value
+            return col_data <= filter_value
 
         # Set operators
         elif operator == "in":
             if not filter_cond.values:
                 raise ValueError("'in' operator requires 'values' parameter")
-            return col_data.isin(filter_cond.values)
+            # Parse datetime values if column is datetime
+            values = filter_cond.values
+            if pd.api.types.is_datetime64_any_dtype(col_data):
+                values = [self._parse_datetime_value(v) for v in values]
+            return col_data.isin(values)
         elif operator == "not_in":
             if not filter_cond.values:
                 raise ValueError("'not_in' operator requires 'values' parameter")
-            return ~col_data.isin(filter_cond.values)
+            # Parse datetime values if column is datetime
+            values = filter_cond.values
+            if pd.api.types.is_datetime64_any_dtype(col_data):
+                values = [self._parse_datetime_value(v) for v in values]
+            return ~col_data.isin(values)
 
         # String operators
         elif operator == "contains":
@@ -234,3 +257,24 @@ class FilterEngine:
                 parts.append(f"{f.column} {f.operator} {f.value}")
 
         return f" {logic} ".join(parts)
+    
+    def _parse_datetime_value(self, value: Any) -> pd.Timestamp:
+        """Parse datetime value from filter.
+        
+        Args:
+            value: Value to parse (string, int, float, or datetime)
+        
+        Returns:
+            pd.Timestamp object
+        """
+        if isinstance(value, pd.Timestamp):
+            return value
+        elif isinstance(value, str):
+            # Parse ISO 8601 string
+            return pd.to_datetime(value)
+        elif isinstance(value, (int, float)):
+            # Parse Excel date number
+            return self._datetime_converter.convert_excel_number_to_datetime(value)
+        else:
+            # Try to convert whatever it is
+            return pd.to_datetime(value)
