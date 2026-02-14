@@ -6,13 +6,8 @@
 """Data validation operations for Excel files."""
 
 import time
-from typing import Any
-
-import pandas as pd
-import psutil
 
 from ..core.file_loader import FileLoader
-from ..core.header_detector import HeaderDetector
 from ..excel.tsv_formatter import TSVFormatter
 from ..models.requests import (
     FindDuplicatesRequest,
@@ -20,14 +15,13 @@ from ..models.requests import (
 )
 from ..models.responses import (
     ExcelOutput,
-    FileMetadata,
     FindDuplicatesResponse,
     FindNullsResponse,
-    PerformanceMetrics,
 )
+from ..operations.base import BaseOperations
 
 
-class ValidationOperations:
+class ValidationOperations(BaseOperations):
     """Data validation operations for Excel data."""
 
     def __init__(self, file_loader: FileLoader) -> None:
@@ -36,109 +30,8 @@ class ValidationOperations:
         Args:
             file_loader: FileLoader instance for loading files
         """
-        self._loader = file_loader
-        self._header_detector = HeaderDetector()
+        super().__init__(file_loader)
         self._tsv_formatter = TSVFormatter()
-
-    def _format_value(self, value: Any) -> Any:
-        """Format value for natural display to agent/user.
-        
-        Converts values to JSON-serializable types:
-        - Floats without decimal parts -> ints
-        - Datetime values -> ISO 8601 strings (per DATE_TIME_ARCHITECTURE.md)
-        - NaN/NaT -> None
-
-        Args:
-            value: Value to format
-
-        Returns:
-            Formatted value (JSON-serializable)
-        """
-        if pd.isna(value):
-            return None
-        elif isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
-            # Convert datetime to ISO 8601 string for agent
-            return value.isoformat()
-        elif pd.api.types.is_datetime64_any_dtype(type(value)):
-            # Handle numpy datetime64
-            return pd.Timestamp(value).isoformat()
-        elif isinstance(value, float) and value.is_integer():
-            return int(value)
-        else:
-            return value
-
-    def _get_performance_metrics(
-        self, start_time: float, rows_processed: int, cache_hit: bool
-    ) -> PerformanceMetrics:
-        """Create performance metrics.
-
-        Args:
-            start_time: Operation start time
-            rows_processed: Number of rows processed
-            cache_hit: Whether cache was used
-
-        Returns:
-            PerformanceMetrics object
-        """
-        execution_time = (time.time() - start_time) * 1000
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-
-        return PerformanceMetrics(
-            execution_time_ms=round(execution_time, 2),
-            rows_processed=rows_processed,
-            cache_hit=cache_hit,
-            memory_used_mb=round(memory_mb, 2),
-        )
-
-    def _get_file_metadata(
-        self, file_path: str, sheet_name: str | None = None
-    ) -> FileMetadata:
-        """Get file metadata.
-
-        Args:
-            file_path: Path to file
-            sheet_name: Optional sheet name
-
-        Returns:
-            FileMetadata object
-        """
-        file_info = self._loader.get_file_info(file_path)
-        return FileMetadata(
-            file_format=file_info["format"],
-            sheet_name=sheet_name,
-            rows_total=None,
-            columns_total=None,
-        )
-
-    def _load_with_header_detection(
-        self, file_path: str, sheet_name: str, header_row: int | None
-    ) -> tuple[pd.DataFrame, int]:
-        """Load DataFrame with header detection.
-
-        Args:
-            file_path: Path to file
-            sheet_name: Sheet name
-            header_row: Optional header row index
-
-        Returns:
-            Tuple of (DataFrame, header_row_used)
-        """
-        if header_row is not None:
-            df = self._loader.load(file_path, sheet_name, header_row=header_row, use_cache=True)
-            detected_row = header_row
-        else:
-            df_preview = self._loader.load(file_path, sheet_name, header_row=None, use_cache=True)
-            detection_result = self._header_detector.detect(df_preview)
-            
-            # Always trust the detector - it picks the best candidate from first 20 rows
-            detected_row = detection_result.header_row
-            df = self._loader.load(file_path, sheet_name, header_row=detected_row, use_cache=True)
-
-        # Normalize column names to strings
-        df.columns = [str(col) for col in df.columns]
-
-        return df, detected_row
 
     def find_duplicates(self, request: FindDuplicatesRequest) -> FindDuplicatesResponse:
         """Find duplicate rows based on specified columns.
@@ -206,7 +99,7 @@ class ValidationOperations:
 
         performance = self._get_performance_metrics(start_time, len(df), False)
 
-        return FindDuplicatesResponse(
+        response = FindDuplicatesResponse(
             duplicates=duplicates,
             duplicate_count=len(duplicates),
             columns_checked=request.columns,
@@ -214,6 +107,15 @@ class ValidationOperations:
             metadata=metadata,
             performance=performance,
         )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(duplicates),
+            columns_count=len(df.columns)
+        )
+
+        return response
 
     def find_nulls(self, request: FindNullsRequest) -> FindNullsResponse:
         """Find null/empty values in specified columns.

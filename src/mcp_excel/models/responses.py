@@ -208,6 +208,7 @@ class CompareSheetsResponse(BaseModel):
 
     differences: list[dict[str, Any]] = Field(description="Rows with differences")
     difference_count: int = Field(description="Number of differences found")
+    truncated: bool = Field(default=False, description="True if differences were truncated due to limit")
     key_column: str = Field(description="Column used as key")
     compare_columns: list[str] = Field(description="Columns compared")
     excel_output: ExcelOutput = Field(description="Excel-formatted output")

@@ -671,40 +671,7 @@ poetry run mypy src/
 
 ## Roadmap
 
-### Phase 1: Core Operations ✅ COMPLETED
-- ✅ File inspection
-- ✅ Sheet analysis
-- ✅ Column operations
-- ✅ Filtering and counting
-- ✅ Basic aggregations
-- ✅ Data retrieval with pagination
-- ✅ Unique values and frequency analysis
-
-### Phase 2: Advanced Analytics ✅ COMPLETED
-- ✅ Group-by operations
-- ✅ Statistical analysis (get_column_stats)
-- ✅ Correlation analysis (correlate)
-- ✅ Outlier detection (detect_outliers)
-
-### Phase 3: Multi-Sheet Operations ✅ COMPLETED
-- ✅ Cross-sheet column search (find_column)
-- ✅ Cross-sheet value search (search_across_sheets)
-- ✅ Sheet comparison (compare_sheets)
-
-### Phase 4: Data Validation ✅ COMPLETED
-- ✅ Find duplicates (find_duplicates)
-- ✅ Find null values (find_nulls)
-
-### Phase 5: Time Series Analysis ✅ COMPLETED
-- ✅ Period-over-period change (calculate_period_change)
-- ✅ Running totals (calculate_running_total)
-- ✅ Moving averages (calculate_moving_average)
-
-### Phase 6: Advanced Operations ✅ COMPLETED
-- ✅ Row ranking with top-N (rank_rows)
-- ✅ Expression calculations (calculate_expression)
-
-### Phase 7: Future Enhancements
+### Future Enhancements
 - ⏳ Write operations (xlsx only)
 - ⏳ CSV support
 - ⏳ SSE transport mode

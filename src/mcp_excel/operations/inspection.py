@@ -6,13 +6,10 @@
 """Inspection operations for Excel files."""
 
 import time
-from typing import Any
 
 import pandas as pd
-import psutil
 
 from ..core.file_loader import FileLoader
-from ..core.header_detector import HeaderDetector
 from ..models.requests import (
     CompareSheetsRequest,
     FindColumnRequest,
@@ -24,18 +21,17 @@ from ..models.requests import (
 from ..models.responses import (
     CompareSheetsResponse,
     ExcelOutput,
-    FileMetadata,
     FindColumnResponse,
     GetColumnNamesResponse,
     GetSheetInfoResponse,
     HeaderDetectionInfo,
     InspectFileResponse,
-    PerformanceMetrics,
     SearchAcrossSheetsResponse,
 )
+from ..operations.base import BaseOperations, MAX_DIFFERENCES
 
 
-class InspectionOperations:
+class InspectionOperations(BaseOperations):
     """Operations for inspecting Excel file structure."""
 
     def __init__(self, file_loader: FileLoader) -> None:
@@ -44,53 +40,7 @@ class InspectionOperations:
         Args:
             file_loader: FileLoader instance for loading files
         """
-        self._loader = file_loader
-        self._header_detector = HeaderDetector()
-
-    def _get_performance_metrics(
-        self, start_time: float, rows_processed: int, cache_hit: bool
-    ) -> PerformanceMetrics:
-        """Create performance metrics.
-
-        Args:
-            start_time: Operation start time
-            rows_processed: Number of rows processed
-            cache_hit: Whether cache was used
-
-        Returns:
-            PerformanceMetrics object
-        """
-        execution_time = (time.time() - start_time) * 1000
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-
-        return PerformanceMetrics(
-            execution_time_ms=round(execution_time, 2),
-            rows_processed=rows_processed,
-            cache_hit=cache_hit,
-            memory_used_mb=round(memory_mb, 2),
-        )
-
-    def _get_file_metadata(
-        self, file_path: str, sheet_name: str | None = None
-    ) -> FileMetadata:
-        """Get file metadata.
-
-        Args:
-            file_path: Path to the file
-            sheet_name: Optional sheet name
-
-        Returns:
-            FileMetadata object
-        """
-        file_info = self._loader.get_file_info(file_path)
-
-        return FileMetadata(
-            file_format=file_info["format"],
-            sheet_name=sheet_name,
-            rows_total=None,
-            columns_total=None,
-        )
+        super().__init__(file_loader)
 
     def inspect_file(self, request: InspectFileRequest) -> InspectFileResponse:
         """Inspect Excel file structure.
@@ -465,9 +415,16 @@ class InspectionOperations:
             indicator=True,
         )
 
-        # Find differences
+        # Find differences (with limit to prevent context overflow)
         differences = []
+        truncated = False
+        
         for _, row in merged.iterrows():
+            # CONTEXT OVERFLOW PROTECTION: Stop if we hit the limit
+            if len(differences) >= MAX_DIFFERENCES:
+                truncated = True
+                break
+                
             diff_entry = {request.key_column: row[request.key_column]}
 
             # Check if row exists in both sheets
@@ -517,6 +474,10 @@ class InspectionOperations:
                 rows.append(row)
 
             tsv = tsv_formatter.format_table(headers, rows)
+            
+            # Add truncation warning if needed
+            if truncated:
+                tsv += f"\n\n[TRUNCATED: Showing first {MAX_DIFFERENCES} differences]"
         else:
             tsv = "No differences found"
 
@@ -527,12 +488,22 @@ class InspectionOperations:
             start_time, len(df1) + len(df2), True
         )
 
-        return CompareSheetsResponse(
+        response = CompareSheetsResponse(
             differences=differences,
             difference_count=len(differences),
+            truncated=truncated,
             key_column=request.key_column,
             compare_columns=request.compare_columns,
             excel_output=excel_output,
             metadata=metadata,
             performance=performance,
         )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(differences),
+            columns_count=len(request.compare_columns) * 2 + 2  # *2 for sheet1/sheet2, +2 for key and status
+        )
+
+        return response

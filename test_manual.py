@@ -1526,15 +1526,13 @@ def main() -> None:
         test_statistics_operations(file_path)
         test_multisheet_operations(file_path)
         test_validation_operations(file_path)
+        test_timeseries_operations(file_path)
+        test_advanced_operations(file_path)
 
         # Test datetime detection
         test_datetime_detection(file_path)
         # This test should be at the very end for ease of copying and pasting
         test_formula_generation(file_path)
-        
-        test_timeseries_operations(file_path)
-        test_advanced_operations(file_path)
-
 
         print_section("✅ All Tests Completed Successfully")
 

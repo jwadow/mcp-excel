@@ -6,13 +6,10 @@
 """Data operations for Excel files - filtering, aggregation, and data retrieval."""
 
 import time
-from typing import Any
 
 import pandas as pd
-import psutil
 
 from ..core.file_loader import FileLoader
-from ..core.header_detector import HeaderDetector
 from ..excel.formula_generator import FormulaGenerator
 from ..excel.tsv_formatter import TSVFormatter
 from ..models.requests import (
@@ -26,18 +23,17 @@ from ..models.requests import (
 from ..models.responses import (
     AggregateResponse,
     ExcelOutput,
-    FileMetadata,
     FilterAndCountResponse,
     FilterAndGetRowsResponse,
     GetUniqueValuesResponse,
     GetValueCountsResponse,
     GroupByResponse,
-    PerformanceMetrics,
 )
+from ..operations.base import BaseOperations
 from ..operations.filtering import FilterEngine
 
 
-class DataOperations:
+class DataOperations(BaseOperations):
     """Operations for retrieving and filtering Excel data."""
 
     def __init__(self, file_loader: FileLoader) -> None:
@@ -46,109 +42,9 @@ class DataOperations:
         Args:
             file_loader: FileLoader instance for loading files
         """
-        self._loader = file_loader
-        self._header_detector = HeaderDetector()
+        super().__init__(file_loader)
         self._filter_engine = FilterEngine()
         self._tsv_formatter = TSVFormatter()
-
-    def _format_value(self, value: Any) -> Any:
-        """Format value for natural display to agent/user.
-        
-        Converts values to JSON-serializable types:
-        - Floats without decimal parts -> ints (50089416.0 -> 50089416)
-        - Datetime values -> ISO 8601 strings (per DATE_TIME_ARCHITECTURE.md)
-        - NaN/NaT -> None
-        
-        Args:
-            value: Value to format
-            
-        Returns:
-            Formatted value (JSON-serializable)
-        """
-        if pd.isna(value):
-            return None
-        elif isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
-            # Convert datetime to ISO 8601 string for agent
-            return value.isoformat()
-        elif pd.api.types.is_datetime64_any_dtype(type(value)):
-            # Handle numpy datetime64
-            return pd.Timestamp(value).isoformat()
-        elif isinstance(value, float) and value.is_integer():
-            return int(value)
-        else:
-            return value
-
-    def _get_performance_metrics(
-        self, start_time: float, rows_processed: int, cache_hit: bool
-    ) -> PerformanceMetrics:
-        """Create performance metrics.
-
-        Args:
-            start_time: Operation start time
-            rows_processed: Number of rows processed
-            cache_hit: Whether cache was used
-
-        Returns:
-            PerformanceMetrics object
-        """
-        execution_time = (time.time() - start_time) * 1000
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-
-        return PerformanceMetrics(
-            execution_time_ms=round(execution_time, 2),
-            rows_processed=rows_processed,
-            cache_hit=cache_hit,
-            memory_used_mb=round(memory_mb, 2),
-        )
-
-    def _get_file_metadata(
-        self, file_path: str, sheet_name: str | None = None
-    ) -> FileMetadata:
-        """Get file metadata.
-
-        Args:
-            file_path: Path to the file
-            sheet_name: Optional sheet name
-
-        Returns:
-            FileMetadata object
-        """
-        file_info = self._loader.get_file_info(file_path)
-
-        return FileMetadata(
-            file_format=file_info["format"],
-            sheet_name=sheet_name,
-            rows_total=None,
-            columns_total=None,
-        )
-
-    def _load_with_header_detection(
-        self, file_path: str, sheet_name: str, header_row: int | None
-    ) -> pd.DataFrame:
-        """Load DataFrame with automatic header detection if needed.
-
-        Args:
-            file_path: Path to the file
-            sheet_name: Sheet name
-            header_row: Header row index (None = auto-detect)
-
-        Returns:
-            Loaded DataFrame with proper headers and normalized column names
-        """
-        if header_row is None:
-            # Auto-detect header
-            df_raw = self._loader.load(file_path, sheet_name, header_row=None, use_cache=True)
-            detection_result = self._header_detector.detect(df_raw)
-            header_row = detection_result.header_row
-
-        # Load with detected/specified header
-        df = self._loader.load(file_path, sheet_name, header_row=header_row, use_cache=True)
-        
-        # Normalize column names to strings for consistent access
-        df.columns = [str(col) for col in df.columns]
-        
-        return df
     
     def _get_column_types(self, df: pd.DataFrame) -> dict[str, str]:
         """Get types of all columns in DataFrame.
@@ -191,7 +87,7 @@ class DataOperations:
         start_time = time.time()
 
         # Load DataFrame
-        df = self._load_with_header_detection(
+        df, _ = self._load_with_header_detection(
             request.file_path, request.sheet_name, request.header_row
         )
 
@@ -244,7 +140,7 @@ class DataOperations:
         start_time = time.time()
 
         # Load DataFrame
-        df = self._load_with_header_detection(
+        df, _ = self._load_with_header_detection(
             request.file_path, request.sheet_name, request.header_row
         )
 
@@ -296,7 +192,7 @@ class DataOperations:
         start_time = time.time()
 
         # Load DataFrame
-        df = self._load_with_header_detection(
+        df, _ = self._load_with_header_detection(
             request.file_path, request.sheet_name, request.header_row
         )
 
@@ -388,7 +284,7 @@ class DataOperations:
         start_time = time.time()
 
         # Load DataFrame
-        df = self._load_with_header_detection(
+        df, _ = self._load_with_header_detection(
             request.file_path, request.sheet_name, request.header_row
         )
 
@@ -401,9 +297,9 @@ class DataOperations:
         filtered_df = self._filter_engine.apply_filters(df, request.filters, request.logic)
         total_matches = len(filtered_df)
 
-        # Apply column selection
+        # CONTEXT OVERFLOW PROTECTION: Apply smart column limit
         if request.columns:
-            # Validate columns
+            # Validate requested columns
             missing_cols = set(request.columns) - set(df.columns)
             if missing_cols:
                 available = ", ".join(str(col) for col in df.columns)
@@ -411,10 +307,17 @@ class DataOperations:
                     f"Columns not found: {', '.join(missing_cols)}. Available: {available}"
                 )
             filtered_df = filtered_df[request.columns]
+            actual_columns = request.columns
+        else:
+            # Apply default column limit to prevent context overflow
+            filtered_df, actual_columns = self._apply_column_limit(filtered_df, None)
 
+        # CONTEXT OVERFLOW PROTECTION: Enforce row limit
+        enforced_limit = self._enforce_row_limit(request.limit)
+        
         # Apply limit and offset
-        result_df = filtered_df.iloc[request.offset : request.offset + request.limit]
-        truncated = total_matches > (request.offset + request.limit)
+        result_df = filtered_df.iloc[request.offset : request.offset + enforced_limit]
+        truncated = total_matches > (request.offset + enforced_limit)
 
         # Convert to list of dicts
         rows = []
@@ -440,7 +343,7 @@ class DataOperations:
 
         performance = self._get_performance_metrics(start_time, len(df), True)
 
-        return FilterAndGetRowsResponse(
+        response = FilterAndGetRowsResponse(
             rows=rows,
             count=len(rows),
             total_matches=total_matches,
@@ -449,6 +352,16 @@ class DataOperations:
             metadata=metadata,
             performance=performance,
         )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(rows),
+            columns_count=len(actual_columns),
+            request_limit=request.limit
+        )
+
+        return response
 
     def aggregate(self, request: AggregateRequest) -> AggregateResponse:
         """Perform aggregation on a column.
@@ -462,7 +375,7 @@ class DataOperations:
         start_time = time.time()
 
         # Load DataFrame
-        df = self._load_with_header_detection(
+        df, _ = self._load_with_header_detection(
             request.file_path, request.sheet_name, request.header_row
         )
 
@@ -615,7 +528,7 @@ class DataOperations:
         start_time = time.time()
 
         # Load DataFrame
-        df = self._load_with_header_detection(
+        df, _ = self._load_with_header_detection(
             request.file_path, request.sheet_name, request.header_row
         )
 
@@ -699,7 +612,7 @@ class DataOperations:
 
         performance = self._get_performance_metrics(start_time, len(df), True)
 
-        return GroupByResponse(
+        response = GroupByResponse(
             groups=groups,
             group_columns=request.group_columns,
             agg_column=request.agg_column,
@@ -708,3 +621,12 @@ class DataOperations:
             metadata=metadata,
             performance=performance,
         )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(groups),
+            columns_count=len(grouped_df.columns)
+        )
+
+        return response

@@ -5,15 +5,12 @@
 
 """Advanced operations for Excel data."""
 
-import re
 import time
-from typing import Any, Optional
+from typing import Optional
 
 import pandas as pd
-import psutil
 
 from ..core.file_loader import FileLoader
-from ..core.header_detector import HeaderDetector
 from ..excel.formula_generator import FormulaGenerator
 from ..excel.tsv_formatter import TSVFormatter
 from ..models.requests import (
@@ -23,14 +20,13 @@ from ..models.requests import (
 from ..models.responses import (
     CalculateExpressionResponse,
     ExcelOutput,
-    FileMetadata,
-    PerformanceMetrics,
     RankRowsResponse,
 )
-from .filtering import FilterEngine
+from ..operations.base import BaseOperations
+from ..operations.filtering import FilterEngine
 
 
-class AdvancedOperations:
+class AdvancedOperations(BaseOperations):
     """Advanced operations for data analysis."""
 
     def __init__(self, file_loader: FileLoader):
@@ -39,98 +35,9 @@ class AdvancedOperations:
         Args:
             file_loader: FileLoader instance for loading Excel files
         """
-        self._loader = file_loader
-        self._header_detector = HeaderDetector()
+        super().__init__(file_loader)
         self._filter_engine = FilterEngine()
         self._tsv_formatter = TSVFormatter()
-
-    def _format_value(self, value: Any) -> Any:
-        """Format value for output (convert float to int if whole number).
-
-        Args:
-            value: Value to format
-
-        Returns:
-            Formatted value
-        """
-        if pd.isna(value):
-            return None
-        elif isinstance(value, float) and value.is_integer():
-            return int(value)
-        else:
-            return value
-
-    def _get_performance_metrics(
-        self, start_time: float, rows_processed: int, cache_hit: bool
-    ) -> PerformanceMetrics:
-        """Get performance metrics for operation.
-
-        Args:
-            start_time: Operation start time
-            rows_processed: Number of rows processed
-            cache_hit: Whether cache was used
-
-        Returns:
-            PerformanceMetrics object
-        """
-        execution_time = (time.time() - start_time) * 1000
-        process = psutil.Process()
-        memory_mb = process.memory_info().rss / 1024 / 1024
-
-        return PerformanceMetrics(
-            execution_time_ms=round(execution_time, 2),
-            rows_processed=rows_processed,
-            cache_hit=cache_hit,
-            memory_used_mb=round(memory_mb, 2),
-        )
-
-    def _get_file_metadata(
-        self, file_path: str, sheet_name: str, df: pd.DataFrame
-    ) -> FileMetadata:
-        """Get file metadata.
-
-        Args:
-            file_path: Path to file
-            sheet_name: Sheet name
-            df: DataFrame
-
-        Returns:
-            FileMetadata object
-        """
-        file_info = self._loader.get_file_info(file_path)
-
-        return FileMetadata(
-            file_format=file_info["format"],
-            sheet_name=sheet_name,
-            rows_total=len(df),
-            columns_total=len(df.columns),
-        )
-
-    def _load_with_header_detection(
-        self, file_path: str, sheet_name: str, header_row: Optional[int]
-    ) -> tuple[pd.DataFrame, int]:
-        """Load file with automatic header detection.
-
-        Args:
-            file_path: Path to file
-            sheet_name: Sheet name
-            header_row: Optional header row index
-
-        Returns:
-            Tuple of (DataFrame, header_row_index)
-        """
-        if header_row is not None:
-            df = self._loader.load(file_path, sheet_name, header_row=header_row, use_cache=True)
-            return df, header_row
-
-        # Auto-detect header
-        df_raw = self._loader.load(file_path, sheet_name, header_row=None, use_cache=True)
-        detection_result = self._header_detector.detect(df_raw)
-        df = self._loader.load(
-            file_path, sheet_name, header_row=detection_result.header_row, use_cache=True
-        )
-
-        return df, detection_result.header_row
 
     def rank_rows(self, request: RankRowsRequest) -> RankRowsResponse:
         """Rank rows by column value.
@@ -211,16 +118,29 @@ class AdvancedOperations:
         else:
             formula = None
 
-        return RankRowsResponse(
+        metadata = self._get_file_metadata(request.file_path, request.sheet_name)
+        metadata.rows_total = len(df)
+        metadata.columns_total = len(df.columns)
+
+        response = RankRowsResponse(
             rows=rows,
             rank_column=request.rank_column,
             direction=request.direction,
             total_rows=len(rows),
             group_by_columns=request.group_by_columns,
             excel_output=ExcelOutput(tsv=tsv, formula=formula),
-            metadata=self._get_file_metadata(request.file_path, request.sheet_name, df),
+            metadata=metadata,
             performance=self._get_performance_metrics(start_time, len(df), False),
         )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(rows),
+            columns_count=len(result_columns)
+        )
+
+        return response
 
     def calculate_expression(
         self, request: CalculateExpressionRequest
@@ -311,11 +231,24 @@ class AdvancedOperations:
         
         formula = f"={excel_formula}"
 
-        return CalculateExpressionResponse(
+        metadata = self._get_file_metadata(request.file_path, request.sheet_name)
+        metadata.rows_total = len(df)
+        metadata.columns_total = len(df.columns)
+
+        response = CalculateExpressionResponse(
             rows=rows,
             expression=request.expression,
             output_column_name=request.output_column_name,
             excel_output=ExcelOutput(tsv=tsv, formula=formula),
-            metadata=self._get_file_metadata(request.file_path, request.sheet_name, df),
+            metadata=metadata,
             performance=self._get_performance_metrics(start_time, len(df), False),
         )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(rows),
+            columns_count=len(result_columns)
+        )
+
+        return response
