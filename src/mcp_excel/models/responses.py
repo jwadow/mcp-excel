@@ -248,6 +248,65 @@ class FindNullsResponse(BaseModel):
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
 
+class CalculatePeriodChangeResponse(BaseModel):
+    """Response for period-over-period change calculation."""
+
+    periods: list[dict[str, Any]] = Field(description="Periods with values and changes")
+    period_type: str = Field(description="Period type used")
+    value_column: str = Field(description="Column analyzed")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
+class CalculateRunningTotalResponse(BaseModel):
+    """Response for running total calculation."""
+
+    rows: list[dict[str, Any]] = Field(description="Rows with running totals")
+    order_column: str = Field(description="Column used for ordering")
+    value_column: str = Field(description="Column summed")
+    group_by_columns: Optional[list[str]] = Field(default=None, description="Columns used for grouping")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
+class CalculateMovingAverageResponse(BaseModel):
+    """Response for moving average calculation."""
+
+    rows: list[dict[str, Any]] = Field(description="Rows with moving averages")
+    order_column: str = Field(description="Column used for ordering")
+    value_column: str = Field(description="Column averaged")
+    window_size: int = Field(description="Window size used")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
+class RankRowsResponse(BaseModel):
+    """Response for row ranking."""
+
+    rows: list[dict[str, Any]] = Field(description="Ranked rows with rank numbers")
+    rank_column: str = Field(description="Column used for ranking")
+    direction: str = Field(description="Ranking direction")
+    total_rows: int = Field(description="Total number of rows ranked")
+    group_by_columns: Optional[list[str]] = Field(default=None, description="Columns used for grouping")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
+class CalculateExpressionResponse(BaseModel):
+    """Response for expression calculation."""
+
+    rows: list[dict[str, Any]] = Field(description="Rows with calculated values")
+    expression: str = Field(description="Expression used")
+    output_column_name: str = Field(description="Name of calculated column")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
 class ErrorResponse(BaseModel):
     """Error response."""
 

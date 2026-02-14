@@ -20,6 +20,10 @@ from mcp_excel.core.file_loader import FileLoader
 from mcp_excel.core.header_detector import HeaderDetector
 from mcp_excel.models.requests import (
     AggregateRequest,
+    CalculateExpressionRequest,
+    CalculateMovingAverageRequest,
+    CalculatePeriodChangeRequest,
+    CalculateRunningTotalRequest,
     CompareSheetsRequest,
     CorrelateRequest,
     DetectOutliersRequest,
@@ -27,6 +31,8 @@ from mcp_excel.models.requests import (
     FilterAndGetRowsRequest,
     FilterCondition,
     FindColumnRequest,
+    FindDuplicatesRequest,
+    FindNullsRequest,
     GetColumnNamesRequest,
     GetColumnStatsRequest,
     GetSheetInfoRequest,
@@ -34,13 +40,14 @@ from mcp_excel.models.requests import (
     GetValueCountsRequest,
     GroupByRequest,
     InspectFileRequest,
+    RankRowsRequest,
     SearchAcrossSheetsRequest,
-    FindDuplicatesRequest,
-    FindNullsRequest,
 )
+from mcp_excel.operations.advanced import AdvancedOperations
 from mcp_excel.operations.data_operations import DataOperations
 from mcp_excel.operations.inspection import InspectionOperations
 from mcp_excel.operations.statistics import StatisticsOperations
+from mcp_excel.operations.timeseries import TimeSeriesOperations
 from mcp_excel.operations.validation import ValidationOperations
 
 
@@ -1175,6 +1182,209 @@ def test_validation_operations(file_path: str) -> None:
         print(f"  ❌ Error: {e}")
 
 
+def test_timeseries_operations(file_path: str) -> None:
+    """Test time series operations."""
+    print_section("Testing Time Series Operations (Block 6)")
+
+    loader = FileLoader()
+    ops = TimeSeriesOperations(loader)
+
+    # Get first sheet name
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info to know available columns
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in sheet")
+        return
+
+    # Find datetime and numeric columns
+    datetime_columns = [col for col, dtype in sheet_info.column_types.items() if dtype == "datetime"]
+    numeric_columns = [col for col, dtype in sheet_info.column_types.items() if dtype in ["integer", "float"]]
+    
+    if not numeric_columns:
+        numeric_columns = [sheet_info.column_names[0]]
+        print(f"  ℹ️ No numeric columns found, trying '{numeric_columns[0]}'")
+
+    print(f"\n📋 Datetime columns: {datetime_columns if datetime_columns else 'None'}")
+    print(f"📋 Numeric columns: {', '.join(numeric_columns[:3])}...")
+
+    # Test 1: calculate_period_change (only if datetime column exists)
+    if datetime_columns:
+        print(f"\n\n📈 Test 1: Calculating period change...")
+        try:
+            date_col = datetime_columns[0]
+            value_col = numeric_columns[0]
+            print(f"  Date column: '{date_col}', Value column: '{value_col}'")
+            
+            request = CalculatePeriodChangeRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                date_column=date_col,
+                value_column=value_col,
+                period_type="month"
+            )
+            response = ops.calculate_period_change(request)
+            
+            print(f"  ✅ Found {len(response.periods)} periods")
+            print(f"  Sample periods (first 3):")
+            for period in response.periods[:3]:
+                print(f"    {period['period']}: value={period['value']}, change={period['change_percent']}%")
+            print(f"\n  📋 Excel formula: {response.excel_output.formula}")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+    else:
+        print(f"\n\n📈 Test 1: Calculating period change...")
+        print(f"  ⚠️ Skipped: No datetime columns found")
+
+    # Test 2: calculate_running_total
+    print(f"\n\n📊 Test 2: Calculating running total...")
+    try:
+        order_col = sheet_info.column_names[0]
+        value_col = numeric_columns[0]
+        print(f"  Order column: '{order_col}', Value column: '{value_col}'")
+        
+        request = CalculateRunningTotalRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            order_column=order_col,
+            value_column=value_col
+        )
+        response = ops.calculate_running_total(request)
+        
+        print(f"  ✅ Calculated running total for {len(response.rows)} rows")
+        print(f"  Sample rows (first 3):")
+        for idx, row in enumerate(response.rows[:3], 1):
+            print(f"    Row {idx}: {dict(list(row.items())[:3])}")
+        print(f"\n  📋 Excel formula: {response.excel_output.formula}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 3: calculate_moving_average
+    print(f"\n\n📉 Test 3: Calculating moving average...")
+    try:
+        order_col = sheet_info.column_names[0]
+        value_col = numeric_columns[0]
+        print(f"  Order column: '{order_col}', Value column: '{value_col}', Window: 3")
+        
+        request = CalculateMovingAverageRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            order_column=order_col,
+            value_column=value_col,
+            window_size=3
+        )
+        response = ops.calculate_moving_average(request)
+        
+        print(f"  ✅ Calculated moving average for {len(response.rows)} rows")
+        print(f"  Sample rows (first 3):")
+        for idx, row in enumerate(response.rows[:3], 1):
+            print(f"    Row {idx}: {dict(list(row.items())[:3])}")
+        print(f"\n  📋 Excel formula: {response.excel_output.formula}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+
+def test_advanced_operations(file_path: str) -> None:
+    """Test advanced operations."""
+    print_section("Testing Advanced Operations (Block 7)")
+
+    loader = FileLoader()
+    ops = AdvancedOperations(loader)
+
+    # Get first sheet name
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info to know available columns
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in sheet")
+        return
+
+    # Find numeric columns
+    numeric_columns = [col for col, dtype in sheet_info.column_types.items() if dtype in ["integer", "float"]]
+    
+    if not numeric_columns:
+        numeric_columns = [sheet_info.column_names[0]]
+        print(f"  ℹ️ No numeric columns found, trying '{numeric_columns[0]}'")
+
+    print(f"\n📋 Numeric columns: {', '.join(numeric_columns[:3])}...")
+
+    # Test 1: rank_rows
+    print(f"\n\n🏆 Test 1: Ranking rows...")
+    try:
+        rank_col = numeric_columns[0]
+        print(f"  Ranking by: '{rank_col}', Direction: desc, Top: 5")
+        
+        request = RankRowsRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            rank_column=rank_col,
+            direction="desc",
+            top_n=5
+        )
+        response = ops.rank_rows(request)
+        
+        print(f"  ✅ Ranked {response.total_rows} rows")
+        print(f"  Top 5 rows:")
+        for row in response.rows[:5]:
+            print(f"    Rank {row['rank']}: {dict(list(row.items())[:4])}")
+        print(f"\n  📋 Excel formula: {response.excel_output.formula}")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 2: calculate_expression
+    if len(numeric_columns) >= 2:
+        print(f"\n\n🧮 Test 2: Calculating expression...")
+        try:
+            col1 = numeric_columns[0]
+            col2 = numeric_columns[1]
+            expression = f"{col1} + {col2}"
+            print(f"  Expression: '{expression}'")
+            
+            request = CalculateExpressionRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                expression=expression,
+                output_column_name="Sum"
+            )
+            response = ops.calculate_expression(request)
+            
+            print(f"  ✅ Calculated expression for {len(response.rows)} rows")
+            print(f"  Sample rows (first 3):")
+            for idx, row in enumerate(response.rows[:3], 1):
+                print(f"    Row {idx}: {dict(list(row.items())[:5])}")
+            print(f"\n  📋 Excel formula: {response.excel_output.formula}")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+    else:
+        print(f"\n\n🧮 Test 2: Calculating expression...")
+        print(f"  ⚠️ Skipped: Need at least 2 numeric columns")
+
+
 def test_datetime_detection(file_path: str) -> None:
     """Test datetime detection through MCP API."""
     print_section("Testing DateTime Detection & Conversion")
@@ -1321,6 +1531,9 @@ def main() -> None:
         test_datetime_detection(file_path)
         # This test should be at the very end for ease of copying and pasting
         test_formula_generation(file_path)
+        
+        test_timeseries_operations(file_path)
+        test_advanced_operations(file_path)
 
 
         print_section("✅ All Tests Completed Successfully")

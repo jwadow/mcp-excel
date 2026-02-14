@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """Pydantic models for API requests."""
 
 from typing import Any, Literal, Optional, Union
@@ -196,4 +201,69 @@ class FindNullsRequest(BaseModel):
     file_path: str = Field(description="Absolute path to the Excel file")
     sheet_name: str = Field(description="Name of the sheet")
     columns: list[str] = Field(description="Columns to check for nulls")
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class CalculatePeriodChangeRequest(BaseModel):
+    """Request to calculate period-over-period change."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    date_column: str = Field(description="Column containing dates")
+    value_column: str = Field(description="Column containing values to analyze")
+    period_type: Literal["month", "quarter", "year"] = Field(description="Period type for grouping")
+    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class CalculateRunningTotalRequest(BaseModel):
+    """Request to calculate running total (cumulative sum)."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    order_column: str = Field(description="Column to order by (typically date)")
+    value_column: str = Field(description="Column containing values to sum")
+    group_by_columns: Optional[list[str]] = Field(default=None, description="Optional columns to group by")
+    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class CalculateMovingAverageRequest(BaseModel):
+    """Request to calculate moving average."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    order_column: str = Field(description="Column to order by (typically date)")
+    value_column: str = Field(description="Column containing values to average")
+    window_size: int = Field(description="Number of periods for moving average window")
+    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class RankRowsRequest(BaseModel):
+    """Request to rank rows by a column value."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    rank_column: str = Field(description="Column to rank by")
+    direction: Literal["asc", "desc"] = Field(default="desc", description="Ranking direction (desc = highest first)")
+    top_n: Optional[int] = Field(default=None, description="Return only top N rows (None = all rows)")
+    group_by_columns: Optional[list[str]] = Field(default=None, description="Optional columns to group by for ranking within groups")
+    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class CalculateExpressionRequest(BaseModel):
+    """Request to calculate expression between columns."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    expression: str = Field(description="Expression to calculate (e.g., 'Price * Quantity')")
+    output_column_name: str = Field(description="Name for the calculated column")
+    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")

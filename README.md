@@ -496,6 +496,126 @@ Find null/empty values in specified columns with detailed statistics.
 - TSV output for Excel
 - First 100 null indices per column
 
+### 18. `calculate_period_change`
+
+Calculate period-over-period change (month/quarter/year growth).
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "date_column": "Date",
+  "value_column": "Revenue",
+  "period_type": "month"
+}
+```
+
+**Output:**
+- Periods with values and changes (absolute and percentage)
+- Excel formula for percentage change
+- TSV output for Excel
+
+**Period types:** `month`, `quarter`, `year`
+
+**Use case:** "Show month-over-month revenue growth"
+
+### 19. `calculate_running_total`
+
+Calculate running total (cumulative sum) ordered by a column.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "order_column": "Date",
+  "value_column": "Revenue",
+  "group_by_columns": ["Region"]
+}
+```
+
+**Output:**
+- Rows with running totals
+- Excel formula (e.g., `=SUM($B$2:B2)`)
+- TSV output for Excel
+- Supports grouping (running total within groups)
+
+**Use case:** "Calculate cumulative revenue by date"
+
+### 20. `calculate_moving_average`
+
+Calculate moving average with specified window size.
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "order_column": "Date",
+  "value_column": "Revenue",
+  "window_size": 7
+}
+```
+
+**Output:**
+- Rows with moving averages
+- Excel formula (e.g., `=AVERAGE(B1:B7)`)
+- TSV output for Excel
+
+**Use case:** "7-day moving average of daily sales"
+
+### 21. `rank_rows`
+
+Rank rows by column value (ascending or descending).
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "rank_column": "Revenue",
+  "direction": "desc",
+  "top_n": 10,
+  "group_by_columns": ["Region"]
+}
+```
+
+**Output:**
+- Ranked rows with rank numbers
+- Excel formula (e.g., `=RANK(B2,$B$2:$B$100,0)`)
+- TSV output for Excel
+- Supports top-N filtering
+- Supports ranking within groups
+
+**Use case:** "Top 10 customers by revenue in each region"
+
+### 22. `calculate_expression`
+
+Calculate expression between columns (arithmetic operations).
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "expression": "Price * Quantity",
+  "output_column_name": "Total"
+}
+```
+
+**Output:**
+- Rows with calculated values
+- Excel formula (e.g., `=A2*B2`)
+- TSV output for Excel
+
+**Supported operations:** `+`, `-`, `*`, `/`, parentheses
+
+**Use cases:**
+- "Calculate revenue = Price * Quantity"
+- "Calculate margin = (Revenue - Cost) / Revenue"
+- "Calculate average speed = Distance / Time"
+
 ## Architecture
 
 ```
@@ -575,7 +695,16 @@ poetry run mypy src/
 - ✅ Find duplicates (find_duplicates)
 - ✅ Find null values (find_nulls)
 
-### Phase 5: Future Enhancements
+### Phase 5: Time Series Analysis ✅ COMPLETED
+- ✅ Period-over-period change (calculate_period_change)
+- ✅ Running totals (calculate_running_total)
+- ✅ Moving averages (calculate_moving_average)
+
+### Phase 6: Advanced Operations ✅ COMPLETED
+- ✅ Row ranking with top-N (rank_rows)
+- ✅ Expression calculations (calculate_expression)
+
+### Phase 7: Future Enhancements
 - ⏳ Write operations (xlsx only)
 - ⏳ CSV support
 - ⏳ SSE transport mode

@@ -16,6 +16,10 @@ from mcp.types import Tool, TextContent
 from .core.file_loader import FileLoader
 from .models.requests import (
     AggregateRequest,
+    CalculateExpressionRequest,
+    CalculateMovingAverageRequest,
+    CalculatePeriodChangeRequest,
+    CalculateRunningTotalRequest,
     CompareSheetsRequest,
     CorrelateRequest,
     DetectOutliersRequest,
@@ -31,11 +35,14 @@ from .models.requests import (
     GetValueCountsRequest,
     GroupByRequest,
     InspectFileRequest,
+    RankRowsRequest,
     SearchAcrossSheetsRequest,
 )
+from .operations.advanced import AdvancedOperations
 from .operations.data_operations import DataOperations
 from .operations.inspection import InspectionOperations
 from .operations.statistics import StatisticsOperations
+from .operations.timeseries import TimeSeriesOperations
 from .operations.validation import ValidationOperations
 
 # Configure logging
@@ -57,6 +64,8 @@ class MCPExcelServer:
         self.data_ops = DataOperations(self.file_loader)
         self.stats_ops = StatisticsOperations(self.file_loader)
         self.validation_ops = ValidationOperations(self.file_loader)
+        self.timeseries_ops = TimeSeriesOperations(self.file_loader)
+        self.advanced_ops = AdvancedOperations(self.file_loader)
 
         # Register handlers
         self._register_handlers()
@@ -699,6 +708,311 @@ class MCPExcelServer:
                         "required": ["file_path", "sheet_name", "columns"],
                     },
                 ),
+                Tool(
+                    name="calculate_period_change",
+                    description="Calculate period-over-period change (month/quarter/year). Returns periods with values and percentage changes.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "date_column": {
+                                "type": "string",
+                                "description": "Column containing dates",
+                            },
+                            "value_column": {
+                                "type": "string",
+                                "description": "Column containing values to analyze",
+                            },
+                            "period_type": {
+                                "type": "string",
+                                "enum": ["month", "quarter", "year"],
+                                "description": "Period type for grouping",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "date_column", "value_column", "period_type"],
+                    },
+                ),
+                Tool(
+                    name="calculate_running_total",
+                    description="Calculate running total (cumulative sum) ordered by a column. Supports grouping.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "order_column": {
+                                "type": "string",
+                                "description": "Column to order by (typically date)",
+                            },
+                            "value_column": {
+                                "type": "string",
+                                "description": "Column containing values to sum",
+                            },
+                            "group_by_columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Optional columns to group by (running total within groups)",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "order_column", "value_column"],
+                    },
+                ),
+                Tool(
+                    name="calculate_moving_average",
+                    description="Calculate moving average with specified window size. Useful for trend analysis.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "order_column": {
+                                "type": "string",
+                                "description": "Column to order by (typically date)",
+                            },
+                            "value_column": {
+                                "type": "string",
+                                "description": "Column containing values to average",
+                            },
+                            "window_size": {
+                                "type": "integer",
+                                "description": "Number of periods for moving average window",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "order_column", "value_column", "window_size"],
+                    },
+                ),
+                Tool(
+                    name="rank_rows",
+                    description="Rank rows by column value (ascending or descending). Supports top-N and grouping.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "rank_column": {
+                                "type": "string",
+                                "description": "Column to rank by",
+                            },
+                            "direction": {
+                                "type": "string",
+                                "enum": ["asc", "desc"],
+                                "description": "Ranking direction (desc = highest first, default: desc)",
+                                "default": "desc",
+                            },
+                            "top_n": {
+                                "type": "integer",
+                                "description": "Return only top N rows (optional, returns all if not specified)",
+                            },
+                            "group_by_columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Optional columns to group by (ranking within groups)",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "rank_column"],
+                    },
+                ),
+                Tool(
+                    name="calculate_expression",
+                    description="Calculate expression between columns (e.g., 'Price * Quantity'). Supports arithmetic operations.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "expression": {
+                                "type": "string",
+                                "description": "Expression to calculate (e.g., 'Price * Quantity', 'Revenue / Cost')",
+                            },
+                            "output_column_name": {
+                                "type": "string",
+                                "description": "Name for the calculated column",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "expression", "output_column_name"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -790,6 +1104,31 @@ class MCPExcelServer:
                 elif name == "find_nulls":
                     request = FindNullsRequest(**arguments)
                     response = self.validation_ops.find_nulls(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "calculate_period_change":
+                    request = CalculatePeriodChangeRequest(**arguments)
+                    response = self.timeseries_ops.calculate_period_change(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "calculate_running_total":
+                    request = CalculateRunningTotalRequest(**arguments)
+                    response = self.timeseries_ops.calculate_running_total(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "calculate_moving_average":
+                    request = CalculateMovingAverageRequest(**arguments)
+                    response = self.timeseries_ops.calculate_moving_average(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "rank_rows":
+                    request = RankRowsRequest(**arguments)
+                    response = self.advanced_ops.rank_rows(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "calculate_expression":
+                    request = CalculateExpressionRequest(**arguments)
+                    response = self.advanced_ops.calculate_expression(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 else:
