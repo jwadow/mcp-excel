@@ -143,6 +143,9 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 
 Get basic information about Excel file structure.
 
+<details>
+<summary>View Input/Output</summary>
+
 **Input:**
 ```json
 {
@@ -156,9 +159,14 @@ Get basic information about Excel file structure.
 - Row/column counts for each sheet
 - Performance metrics
 
+</details>
+
 ### 2. `get_sheet_info`
 
 Get detailed information about a specific sheet.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -176,9 +184,14 @@ Get detailed information about a specific sheet.
 - Header detection info (if auto-detected)
 - Performance metrics
 
+</details>
+
 ### 3. `get_column_names`
 
 Quick operation to get just the column names.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -192,9 +205,14 @@ Quick operation to get just the column names.
 - List of column names
 - Column count
 
+</details>
+
 ### 4. `get_unique_values`
 
 Get unique values from a column (useful for building filters).
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -211,9 +229,14 @@ Get unique values from a column (useful for building filters).
 - Count of unique values
 - Truncated flag if limit exceeded
 
+</details>
+
 ### 5. `get_value_counts`
 
 Get frequency counts for values in a column (top N most common).
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -230,9 +253,14 @@ Get frequency counts for values in a column (top N most common).
 - Total number of values
 - TSV output for Excel
 
+</details>
+
 ### 6. `filter_and_count`
 
 Count rows matching filter conditions.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -254,9 +282,14 @@ Count rows matching filter conditions.
 
 **Supported operators:** `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`, `not_in`, `contains`, `startswith`, `endswith`, `regex`, `is_null`, `is_not_null`
 
+</details>
+
 ### 7. `filter_and_get_rows`
 
 Get rows matching filter conditions with pagination.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -279,9 +312,14 @@ Get rows matching filter conditions with pagination.
 - Truncated flag
 - TSV output for Excel
 
+</details>
+
 ### 8. `aggregate`
 
 Perform aggregation (sum, mean, count, etc.) on a column with optional filters.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -305,9 +343,14 @@ Perform aggregation (sum, mean, count, etc.) on a column with optional filters.
 
 **Special feature:** Automatically converts text-stored numbers to numeric (common Excel issue).
 
+</details>
+
 ### 9. `group_by`
 
 Group data by columns and perform aggregation (like Excel Pivot Table).
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -325,9 +368,14 @@ Group data by columns and perform aggregation (like Excel Pivot Table).
 - TSV output for Excel
 - Supports multiple grouping columns
 
+</details>
+
 ### 10. `find_column`
 
 Find a column across all sheets or in a specific sheet.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -343,9 +391,14 @@ Find a column across all sheets or in a specific sheet.
 - Column index and row count for each match
 - Case-insensitive search
 
+</details>
+
 ### 11. `search_across_sheets`
 
 Search for a specific value across all sheets in the file.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -362,9 +415,14 @@ Search for a specific value across all sheets in the file.
 - Total matches across all sheets
 - Supports both numeric and string values
 
+</details>
+
 ### 12. `compare_sheets`
 
 Compare data between two sheets using a key column.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -383,9 +441,14 @@ Compare data between two sheets using a key column.
 - Side-by-side comparison of values
 - TSV output for Excel
 
+</details>
+
 ### 13. `get_column_stats`
 
 Get statistical summary of a column.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -402,9 +465,14 @@ Get statistical summary of a column.
 - Null count
 - TSV output for Excel
 
+</details>
+
 ### 14. `correlate`
 
 Calculate correlation matrix between multiple columns.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -422,9 +490,14 @@ Calculate correlation matrix between multiple columns.
 - Works with 2+ columns
 - TSV output for Excel
 
+</details>
+
 ### 15. `detect_outliers`
 
 Detect outliers in a column using IQR or Z-score method.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -443,9 +516,14 @@ Detect outliers in a column using IQR or Z-score method.
 - Method and threshold used
 - TSV output for Excel
 
+</details>
+
 ### 16. `find_duplicates`
 
 Find duplicate rows based on specified columns.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -465,9 +543,14 @@ Find duplicate rows based on specified columns.
 
 **Note:** Uses `duplicated(keep=False)` to mark all duplicates including first occurrence.
 
+</details>
+
 ### 17. `find_nulls`
 
 Find null/empty values in specified columns with detailed statistics.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -484,9 +567,14 @@ Find null/empty values in specified columns with detailed statistics.
 - TSV output for Excel
 - First 100 null indices per column
 
+</details>
+
 ### 18. `calculate_period_change`
 
 Calculate period-over-period change (month/quarter/year growth).
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -508,9 +596,14 @@ Calculate period-over-period change (month/quarter/year growth).
 
 **Use case:** "Show month-over-month revenue growth"
 
+</details>
+
 ### 19. `calculate_running_total`
 
 Calculate running total (cumulative sum) ordered by a column.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -531,9 +624,14 @@ Calculate running total (cumulative sum) ordered by a column.
 
 **Use case:** "Calculate cumulative revenue by date"
 
+</details>
+
 ### 20. `calculate_moving_average`
 
 Calculate moving average with specified window size.
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -553,9 +651,14 @@ Calculate moving average with specified window size.
 
 **Use case:** "7-day moving average of daily sales"
 
+</details>
+
 ### 21. `rank_rows`
 
 Rank rows by column value (ascending or descending).
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -578,9 +681,14 @@ Rank rows by column value (ascending or descending).
 
 **Use case:** "Top 10 customers by revenue in each region"
 
+</details>
+
 ### 22. `calculate_expression`
 
 Calculate expression between columns (arithmetic operations).
+
+<details>
+<summary>View Input/Output</summary>
 
 **Input:**
 ```json
@@ -603,6 +711,8 @@ Calculate expression between columns (arithmetic operations).
 - "Calculate revenue = Price * Quantity"
 - "Calculate margin = (Revenue - Cost) / Revenue"
 - "Calculate average speed = Distance / Time"
+
+</details>
 
 ## Roadmap
 
