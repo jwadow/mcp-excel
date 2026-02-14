@@ -16,9 +16,12 @@ from mcp.types import Tool, TextContent
 from .core.file_loader import FileLoader
 from .models.requests import (
     AggregateRequest,
+    CorrelateRequest,
+    DetectOutliersRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
     GetColumnNamesRequest,
+    GetColumnStatsRequest,
     GetSheetInfoRequest,
     GetUniqueValuesRequest,
     GetValueCountsRequest,
@@ -27,6 +30,7 @@ from .models.requests import (
 )
 from .operations.data_operations import DataOperations
 from .operations.inspection import InspectionOperations
+from .operations.statistics import StatisticsOperations
 
 # Configure logging
 logging.basicConfig(
@@ -45,6 +49,7 @@ class MCPExcelServer:
         self.file_loader = FileLoader()
         self.inspection_ops = InspectionOperations(self.file_loader)
         self.data_ops = DataOperations(self.file_loader)
+        self.stats_ops = StatisticsOperations(self.file_loader)
 
         # Register handlers
         self._register_handlers()
@@ -406,6 +411,154 @@ class MCPExcelServer:
                         "required": ["file_path", "sheet_name", "group_columns", "agg_column", "agg_operation"],
                     },
                 ),
+                Tool(
+                    name="get_column_stats",
+                    description="Get statistical summary of a column (count, mean, median, std, min, max, quartiles)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "column": {
+                                "type": "string",
+                                "description": "Column name to analyze",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "column"],
+                    },
+                ),
+                Tool(
+                    name="correlate",
+                    description="Calculate correlation matrix between multiple columns (supports 2+ columns)",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to correlate (minimum 2 columns)",
+                            },
+                            "method": {
+                                "type": "string",
+                                "enum": ["pearson", "spearman", "kendall"],
+                                "description": "Correlation method (default: pearson)",
+                                "default": "pearson",
+                            },
+                            "filters": {
+                                "type": "array",
+                                "description": "Optional filter conditions",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "column": {"type": "string"},
+                                        "operator": {
+                                            "type": "string",
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                        },
+                                        "value": {"description": "Value for single-value operators"},
+                                        "values": {
+                                            "type": "array",
+                                            "description": "Values for 'in' and 'not_in' operators"
+                                        }
+                                    },
+                                    "required": ["column", "operator"]
+                                }
+                            },
+                            "logic": {
+                                "type": "string",
+                                "enum": ["AND", "OR"],
+                                "description": "Logic operator for combining filters (default: AND)",
+                                "default": "AND",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "columns"],
+                    },
+                ),
+                Tool(
+                    name="detect_outliers",
+                    description="Detect outliers in a column using IQR or Z-score method",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "column": {
+                                "type": "string",
+                                "description": "Column name to analyze",
+                            },
+                            "method": {
+                                "type": "string",
+                                "enum": ["iqr", "zscore"],
+                                "description": "Outlier detection method (default: iqr)",
+                                "default": "iqr",
+                            },
+                            "threshold": {
+                                "type": "number",
+                                "description": "Threshold for outlier detection (IQR multiplier or Z-score, default: 1.5)",
+                                "default": 1.5,
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "column"],
+                    },
+                ),
             ]
 
         @self.server.call_tool()
@@ -457,6 +610,21 @@ class MCPExcelServer:
                 elif name == "group_by":
                     request = GroupByRequest(**arguments)
                     response = self.data_ops.group_by(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "get_column_stats":
+                    request = GetColumnStatsRequest(**arguments)
+                    response = self.stats_ops.get_column_stats(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "correlate":
+                    request = CorrelateRequest(**arguments)
+                    response = self.stats_ops.correlate(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "detect_outliers":
+                    request = DetectOutliersRequest(**arguments)
+                    response = self.stats_ops.detect_outliers(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 else:

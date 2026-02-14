@@ -20,10 +20,13 @@ from mcp_excel.core.file_loader import FileLoader
 from mcp_excel.core.header_detector import HeaderDetector
 from mcp_excel.models.requests import (
     AggregateRequest,
+    CorrelateRequest,
+    DetectOutliersRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
     FilterCondition,
     GetColumnNamesRequest,
+    GetColumnStatsRequest,
     GetSheetInfoRequest,
     GetUniqueValuesRequest,
     GetValueCountsRequest,
@@ -32,6 +35,7 @@ from mcp_excel.models.requests import (
 )
 from mcp_excel.operations.data_operations import DataOperations
 from mcp_excel.operations.inspection import InspectionOperations
+from mcp_excel.operations.statistics import StatisticsOperations
 
 
 def print_section(title: str) -> None:
@@ -505,6 +509,330 @@ def test_aggregation_operations(file_path: str) -> None:
             print(f"  ❌ Error: {e}")
 
 
+def test_formula_generation(file_path: str) -> None:
+    """Test Excel formula generation for all operators."""
+    print_section("Testing Excel Formula Generation")
+
+    loader = FileLoader()
+    ops = DataOperations(loader)
+
+    # Get first sheet name
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names or len(sheet_info.column_names) < 2:
+        print("❌ Need at least 2 columns for testing")
+        return
+
+    first_column = sheet_info.column_names[0]
+    
+    # Get a sample value for testing
+    unique_request = GetUniqueValuesRequest(
+        file_path=file_path,
+        sheet_name=sheet_name,
+        column=first_column,
+        limit=1
+    )
+    unique_response = ops.get_unique_values(unique_request)
+    
+    if not unique_response.values:
+        print("❌ No values found for testing")
+        return
+    
+    test_value = unique_response.values[0]
+    print(f"\n📋 Test column: '{first_column}'")
+    print(f"📋 Test value: '{test_value}'")
+
+    # Test all comparison operators
+    print(f"\n\n🔢 Testing Comparison Operators:")
+    
+    operators_to_test = [
+        ("==", test_value, "Equal to"),
+        ("!=", test_value, "Not equal to"),
+        (">", test_value, "Greater than"),
+        ("<", test_value, "Less than"),
+        (">=", test_value, "Greater or equal"),
+        ("<=", test_value, "Less or equal"),
+    ]
+    
+    for operator, value, description in operators_to_test:
+        try:
+            request = FilterAndCountRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                filters=[
+                    FilterCondition(column=first_column, operator=operator, value=value)
+                ],
+                logic="AND"
+            )
+            response = ops.filter_and_count(request)
+            
+            print(f"\n  {description} ({operator}):")
+            print(f"    Count: {response.count}")
+            print(f"    Formula: {response.excel_output.formula}")
+        except Exception as e:
+            print(f"\n  {description} ({operator}): ❌ Error: {e}")
+
+    # Test text operators (if column is string)
+    if isinstance(test_value, str) and len(test_value) > 2:
+        print(f"\n\n📝 Testing Text Operators:")
+        
+        text_operators = [
+            ("contains", test_value[:3], f"Contains '{test_value[:3]}'"),
+            ("startswith", test_value[:2], f"Starts with '{test_value[:2]}'"),
+            ("endswith", test_value[-2:], f"Ends with '{test_value[-2:]}'"),
+        ]
+        
+        for operator, value, description in text_operators:
+            try:
+                request = FilterAndCountRequest(
+                    file_path=file_path,
+                    sheet_name=sheet_name,
+                    filters=[
+                        FilterCondition(column=first_column, operator=operator, value=value)
+                    ],
+                    logic="AND"
+                )
+                response = ops.filter_and_count(request)
+                
+                print(f"\n  {description}:")
+                print(f"    Count: {response.count}")
+                print(f"    Formula: {response.excel_output.formula}")
+            except Exception as e:
+                print(f"\n  {description}: ❌ Error: {e}")
+
+    # Test 'in' operator
+    print(f"\n\n📦 Testing Set Operators:")
+    
+    # Get multiple values for 'in' test
+    unique_request_multi = GetUniqueValuesRequest(
+        file_path=file_path,
+        sheet_name=sheet_name,
+        column=first_column,
+        limit=3
+    )
+    unique_response_multi = ops.get_unique_values(unique_request_multi)
+    
+    if len(unique_response_multi.values) >= 2:
+        test_values = unique_response_multi.values[:2]
+        
+        try:
+            request = FilterAndCountRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                filters=[
+                    FilterCondition(column=first_column, operator="in", values=test_values)
+                ],
+                logic="AND"
+            )
+            response = ops.filter_and_count(request)
+            
+            print(f"\n  In {test_values}:")
+            print(f"    Count: {response.count}")
+            print(f"    Formula: {response.excel_output.formula}")
+        except Exception as e:
+            print(f"\n  In operator: ❌ Error: {e}")
+
+    # Test null operators
+    print(f"\n\n🔍 Testing Null Operators:")
+    
+    null_operators = [
+        ("is_null", None, "Is null"),
+        ("is_not_null", None, "Is not null"),
+    ]
+    
+    for operator, value, description in null_operators:
+        try:
+            request = FilterAndCountRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                filters=[
+                    FilterCondition(column=first_column, operator=operator, value=value)
+                ],
+                logic="AND"
+            )
+            response = ops.filter_and_count(request)
+            
+            print(f"\n  {description}:")
+            print(f"    Count: {response.count}")
+            print(f"    Formula: {response.excel_output.formula}")
+        except Exception as e:
+            print(f"\n  {description}: ❌ Error: {e}")
+
+    print(f"\n\n💡 Tip: Copy any formula above and paste it into Excel to verify it works!")
+
+
+def test_statistics_operations(file_path: str) -> None:
+    """Test statistical operations."""
+    print_section("Testing Statistics Operations")
+
+    loader = FileLoader()
+    ops = StatisticsOperations(loader)
+
+    # Get first sheet name
+    sheet_names = loader.get_sheet_names(file_path)
+    if not sheet_names:
+        print("❌ No sheets found in file")
+        return
+
+    sheet_name = sheet_names[0]
+    print(f"📊 Using sheet: {sheet_name}")
+
+    # Get sheet info to know available columns
+    inspection_ops = InspectionOperations(loader)
+    sheet_info_request = GetSheetInfoRequest(file_path=file_path, sheet_name=sheet_name)
+    sheet_info = inspection_ops.get_sheet_info(sheet_info_request)
+    
+    if not sheet_info.column_names:
+        print("❌ No columns found in sheet")
+        return
+
+    # Find numeric columns for statistics
+    numeric_columns = []
+    for col_name, col_type in sheet_info.column_types.items():
+        if col_type in ["integer", "float"]:
+            numeric_columns.append(col_name)
+    
+    if not numeric_columns:
+        # Try first column as fallback
+        numeric_columns = [sheet_info.column_names[0]]
+        print(f"  ℹ️ No numeric columns found, trying '{numeric_columns[0]}' (may contain numeric data as text)")
+    
+    print(f"\n📋 Numeric columns found: {', '.join(numeric_columns[:3])}...")
+    test_column = numeric_columns[0]
+
+    # Test 1: Get column statistics
+    print(f"\n\n📊 Test 1: Getting statistics for '{test_column}'...")
+    try:
+        request = GetColumnStatsRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=test_column,
+            filters=[]
+        )
+        response = ops.get_column_stats(request)
+        
+        print(f"  ✅ Statistics:")
+        print(f"    Count: {response.stats.count}")
+        print(f"    Mean: {response.stats.mean:.2f}")
+        print(f"    Median: {response.stats.median:.2f}")
+        std_str = f"{response.stats.std:.2f}" if response.stats.std is not None else "N/A"
+        print(f"    Std Dev: {std_str}")
+        print(f"    Min: {response.stats.min}")
+        print(f"    Max: {response.stats.max}")
+        print(f"    25th Percentile: {response.stats.q25:.2f}")
+        print(f"    75th Percentile: {response.stats.q75:.2f}")
+        print(f"    Null Count: {response.stats.null_count}")
+        print(f"\n  📋 TSV Output (first 150 chars):")
+        print(f"    {response.excel_output.tsv[:150]}...")
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 2: Correlation analysis (if we have 2+ numeric columns)
+    if len(numeric_columns) >= 2:
+        print(f"\n\n🔗 Test 2: Correlation analysis between columns...")
+        try:
+            # Use first 2-3 numeric columns
+            corr_columns = numeric_columns[:min(3, len(numeric_columns))]
+            print(f"  Analyzing: {', '.join(corr_columns)}")
+            
+            request = CorrelateRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                columns=corr_columns,
+                method="pearson",
+                filters=[]
+            )
+            response = ops.correlate(request)
+            
+            print(f"  ✅ Correlation matrix ({response.method}):")
+            for col1 in corr_columns:
+                print(f"    {col1}:")
+                for col2 in corr_columns:
+                    corr_value = response.correlation_matrix[col1][col2]
+                    print(f"      vs {col2}: {corr_value:.4f}")
+            
+            print(f"\n  📋 TSV Output (first 200 chars):")
+            print(f"    {response.excel_output.tsv[:200]}...")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+    else:
+        print(f"\n\n🔗 Test 2: Correlation analysis...")
+        print(f"  ⚠️ Skipped: Need at least 2 numeric columns (found {len(numeric_columns)})")
+
+    # Test 3: Outlier detection (IQR method)
+    print(f"\n\n🎯 Test 3: Detecting outliers in '{test_column}' (IQR method)...")
+    try:
+        request = DetectOutliersRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=test_column,
+            method="iqr",
+            threshold=1.5
+        )
+        response = ops.detect_outliers(request)
+        
+        print(f"  ✅ Outliers detected: {response.outlier_count}")
+        print(f"  Method: {response.method}")
+        print(f"  Threshold: {response.threshold}")
+        
+        if response.outliers:
+            print(f"\n  Sample outliers (first 3):")
+            for idx, outlier in enumerate(response.outliers[:3], 1):
+                # Show first 3 fields of each outlier
+                outlier_preview = dict(list(outlier.items())[:3])
+                print(f"    Outlier {idx}: {outlier_preview}")
+            
+            print(f"\n  📋 TSV Output (first 200 chars):")
+            print(f"    {response.excel_output.tsv[:200]}...")
+        else:
+            print(f"  ℹ️ No outliers found with current threshold")
+        
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+    # Test 4: Outlier detection (Z-score method)
+    print(f"\n\n🎯 Test 4: Detecting outliers in '{test_column}' (Z-score method)...")
+    try:
+        request = DetectOutliersRequest(
+            file_path=file_path,
+            sheet_name=sheet_name,
+            column=test_column,
+            method="zscore",
+            threshold=3.0
+        )
+        response = ops.detect_outliers(request)
+        
+        print(f"  ✅ Outliers detected: {response.outlier_count}")
+        print(f"  Method: {response.method}")
+        print(f"  Threshold: {response.threshold}")
+        
+        if response.outliers:
+            print(f"  Sample outliers (first 2):")
+            for idx, outlier in enumerate(response.outliers[:2], 1):
+                outlier_preview = dict(list(outlier.items())[:3])
+                print(f"    Outlier {idx}: {outlier_preview}")
+        else:
+            print(f"  ℹ️ No outliers found with current threshold")
+        
+        print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
+
+
 def main() -> None:
     """Main test function."""
     print("\n" + "=" * 80)
@@ -543,6 +871,10 @@ def main() -> None:
         test_inspection_operations(file_path)
         test_data_operations(file_path)
         test_aggregation_operations(file_path)
+        test_statistics_operations(file_path)
+
+        # This test should be at the very end for ease of copying and pasting
+        test_formula_generation(file_path)
 
         print_section("✅ All Tests Completed Successfully")
 

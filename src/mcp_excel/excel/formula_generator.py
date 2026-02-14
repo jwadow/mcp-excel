@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """Excel formula generator for dynamic calculations."""
 
 from typing import Any, Optional
@@ -207,36 +212,206 @@ class FormulaGenerator:
             if not criteria_range:
                 raise ValueError(f"Column {filter_cond.column} not found in ranges")
 
-            if filter_cond.operator == "==":
-                if operation == "count":
-                    return self.generate_countif(criteria_range, filter_cond.value)
-                elif operation == "sum" and target_range:
-                    return self.generate_sumif(criteria_range, filter_cond.value, target_range)
-                elif operation == "mean" and target_range:
-                    return self.generate_averageif(criteria_range, filter_cond.value, target_range)
+            return self._generate_single_filter_formula(
+                operation, filter_cond, criteria_range, target_range
+            )
 
         # Multiple filters - use SUMIFS/COUNTIFS
+        return self._generate_multiple_filters_formula(
+            operation, filters, column_ranges, target_range
+        )
+    
+    def _generate_single_filter_formula(
+        self,
+        operation: str,
+        filter_cond: FilterCondition,
+        criteria_range: str,
+        target_range: Optional[str],
+    ) -> str:
+        """Generate formula for single filter condition."""
+        operator = filter_cond.operator
+        
+        # Comparison operators: ==, !=, >, <, >=, <=
+        if operator in ["==", "!=", ">", "<", ">=", "<="]:
+            criteria = self._format_criteria(operator, filter_cond.value)
+            
+            if operation == "count":
+                return f"=COUNTIF({criteria_range},{criteria})"
+            elif operation == "sum" and target_range:
+                return f"=SUMIF({criteria_range},{criteria},{target_range})"
+            elif operation == "mean" and target_range:
+                return f"=AVERAGEIF({criteria_range},{criteria},{target_range})"
+        
+        # Set operators: in, not_in
+        elif operator == "in":
+            if not filter_cond.values:
+                return "=NA()  // 'in' operator requires values"
+            
+            # Use SUMPRODUCT for multiple values
+            conditions = "+".join(
+                f"({criteria_range}={self._escape_value(v)})"
+                for v in filter_cond.values
+            )
+            
+            if operation == "count":
+                return f"=SUMPRODUCT({conditions})"
+            elif operation == "sum" and target_range:
+                return f"=SUMPRODUCT(({conditions})*{target_range})"
+            elif operation == "mean" and target_range:
+                # Average = Sum / Count
+                sum_formula = f"SUMPRODUCT(({conditions})*{target_range})"
+                count_formula = f"SUMPRODUCT({conditions})"
+                return f"={sum_formula}/{count_formula}"
+        
+        elif operator == "not_in":
+            if not filter_cond.values:
+                return "=NA()  // 'not_in' operator requires values"
+            
+            # Total count minus matching count
+            conditions = "+".join(
+                f"({criteria_range}={self._escape_value(v)})"
+                for v in filter_cond.values
+            )
+            
+            if operation == "count":
+                return f"=COUNTA({criteria_range})-SUMPRODUCT({conditions})"
+            else:
+                return "=NA()  // 'not_in' with sum/mean not supported in Excel formulas"
+        
+        # Text operators: contains, startswith, endswith
+        elif operator == "contains":
+            # Use wildcards: *text*
+            criteria = f'"*{filter_cond.value}*"'
+            
+            if operation == "count":
+                return f"=COUNTIF({criteria_range},{criteria})"
+            elif operation == "sum" and target_range:
+                return f"=SUMIF({criteria_range},{criteria},{target_range})"
+            elif operation == "mean" and target_range:
+                return f"=AVERAGEIF({criteria_range},{criteria},{target_range})"
+        
+        elif operator == "startswith":
+            # Use wildcards: text*
+            criteria = f'"{filter_cond.value}*"'
+            
+            if operation == "count":
+                return f"=COUNTIF({criteria_range},{criteria})"
+            elif operation == "sum" and target_range:
+                return f"=SUMIF({criteria_range},{criteria},{target_range})"
+            elif operation == "mean" and target_range:
+                return f"=AVERAGEIF({criteria_range},{criteria},{target_range})"
+        
+        elif operator == "endswith":
+            # Use wildcards: *text
+            criteria = f'"*{filter_cond.value}"'
+            
+            if operation == "count":
+                return f"=COUNTIF({criteria_range},{criteria})"
+            elif operation == "sum" and target_range:
+                return f"=SUMIF({criteria_range},{criteria},{target_range})"
+            elif operation == "mean" and target_range:
+                return f"=AVERAGEIF({criteria_range},{criteria},{target_range})"
+        
+        # Null operators: is_null, is_not_null
+        elif operator == "is_null":
+            if operation == "count":
+                return f"=COUNTBLANK({criteria_range})"
+            else:
+                return "=NA()  // 'is_null' with sum/mean not supported"
+        
+        elif operator == "is_not_null":
+            if operation == "count":
+                return f"=COUNTA({criteria_range})"
+            elif operation == "sum" and target_range:
+                return f"=SUM({target_range})"
+            elif operation == "mean" and target_range:
+                return f"=AVERAGE({target_range})"
+        
+        # Regex - not supported in Excel
+        elif operator == "regex":
+            return "=NA()  // Regex not supported in Excel formulas"
+        
+        else:
+            return f"=NA()  // Operator '{operator}' not supported"
+    
+    def _generate_multiple_filters_formula(
+        self,
+        operation: str,
+        filters: list[FilterCondition],
+        column_ranges: dict[str, str],
+        target_range: Optional[str],
+    ) -> str:
+        """Generate formula for multiple filter conditions."""
+        # Check if all filters use simple operators
+        simple_operators = ["==", "!=", ">", "<", ">=", "<="]
+        
         criteria_ranges = []
         criteria_values = []
-
+        
         for filter_cond in filters:
-            if filter_cond.operator != "==":
-                # Complex operators not supported in simple formulas
-                return f"=NA()  // Complex filter not supported in formula"
-
+            if filter_cond.operator not in simple_operators:
+                # Complex operators not supported in COUNTIFS/SUMIFS
+                return f"=NA()  // Multiple filters with '{filter_cond.operator}' not supported"
+            
             criteria_range = column_ranges.get(filter_cond.column)
             if not criteria_range:
                 continue
-
+            
             criteria_ranges.append(criteria_range)
-            criteria_values.append(filter_cond.value)
-
+            criteria_values.append(
+                self._format_criteria(filter_cond.operator, filter_cond.value)
+            )
+        
         if operation == "count":
             return self.generate_countifs(criteria_ranges, criteria_values)
         elif operation == "sum" and target_range:
             return self.generate_sumifs(target_range, criteria_ranges, criteria_values)
         else:
-            return f"=NA()  // Operation {operation} with multiple filters not supported"
+            return f"=NA()  // Operation '{operation}' with multiple filters not fully supported"
+    
+    def _format_criteria(self, operator: str, value: Any) -> str:
+        """Format criteria for COUNTIF/SUMIF functions.
+        
+        Args:
+            operator: Comparison operator
+            value: Value to compare
+            
+        Returns:
+            Formatted criteria string for Excel
+            
+        Examples:
+            == with "text" → "text"
+            != with "text" → "<>text"
+            > with 10 → ">10"
+            >= with 10 → ">=10"
+        """
+        if operator == "==":
+            # Simple equality
+            return self._escape_value(value)
+        
+        elif operator == "!=":
+            # Not equal: "<>value"
+            if isinstance(value, str):
+                # For strings: "<>text"
+                escaped = value.replace('"', '""')
+                return f'"<>{escaped}"'
+            else:
+                # For numbers: "<>10"
+                return f'"<>{value}"'
+        
+        elif operator in [">", "<", ">=", "<="]:
+            # Comparison operators: ">10", ">=10", etc.
+            if isinstance(value, str):
+                # For strings: ">text"
+                escaped = value.replace('"', '""')
+                return f'"{operator}{escaped}"'
+            else:
+                # For numbers: ">10"
+                return f'"{operator}{value}"'
+        
+        else:
+            # Fallback
+            return self._escape_value(value)
 
     def get_references(
         self, column_names: list[str], column_indices: dict[str, int]
