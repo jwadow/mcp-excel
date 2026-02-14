@@ -244,13 +244,12 @@ class AdvancedOperations:
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
-        # Parse expression to find column names
-        # Support column names (including those with spaces)
-        column_pattern = r'\b[A-Za-z_][A-Za-z0-9_\s]*\b'
-        potential_columns = re.findall(column_pattern, request.expression)
-        
-        # Filter to only actual column names
-        used_columns = [col for col in potential_columns if col in df.columns]
+        # Find which DataFrame columns are used in the expression
+        # Sort by length (longest first) to avoid partial matches
+        # Example: "Дата прибытия" must be found before "Дата"
+        # This approach is language-agnostic and works with any Unicode characters
+        sorted_columns = sorted(df.columns, key=len, reverse=True)
+        used_columns = [col for col in sorted_columns if col in request.expression]
         
         if not used_columns:
             raise ValueError(
