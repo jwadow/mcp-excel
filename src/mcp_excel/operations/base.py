@@ -237,3 +237,50 @@ class BaseOperations:
         if limit > MAX_ROW_LIMIT:
             return MAX_ROW_LIMIT
         return limit
+
+    def _ensure_numeric_column(
+        self,
+        col_data: pd.Series,
+        col_name: str,
+        min_conversion_rate: float = 0.5
+    ) -> pd.Series:
+        """Convert column to numeric or raise informative error.
+        
+        Attempts to convert object/string columns to numeric type.
+        If conversion fails for too many values, raises a clear error message.
+        
+        Args:
+            col_data: Column data to convert
+            col_name: Column name for error messages
+            min_conversion_rate: Minimum % of values that must convert (default 50%)
+            
+        Returns:
+            Numeric Series (float64 dtype)
+            
+        Raises:
+            ValueError: If column is not numeric and cannot be converted
+        """
+        # If already numeric, return as-is
+        if pd.api.types.is_numeric_dtype(col_data):
+            return col_data
+        
+        # Try to convert object/string columns to numeric
+        if col_data.dtype == 'object' or col_data.dtype.name == 'string':
+            col_numeric = pd.to_numeric(col_data, errors='coerce')
+            non_null_original = col_data.notna().sum()
+            non_null_converted = col_numeric.notna().sum()
+            
+            # Check if conversion was successful (at least min_conversion_rate % converted)
+            if non_null_converted >= non_null_original * min_conversion_rate:
+                return col_numeric
+            else:
+                raise ValueError(
+                    f"Column '{col_name}' is not numeric. "
+                    f"Only {non_null_converted}/{non_null_original} values could be converted to numbers."
+                )
+        
+        # If not numeric and not object/string, raise error
+        raise ValueError(
+            f"Column '{col_name}' must be numeric for this operation. "
+            f"Current type: {col_data.dtype}"
+        )

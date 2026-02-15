@@ -73,27 +73,8 @@ class StatisticsOperations(BaseOperations):
         # Get column data
         col_data = df[request.column]
 
-        # Try to convert to numeric if it's object/string type
-        if col_data.dtype == 'object' or col_data.dtype.name == 'string':
-            col_data_numeric = pd.to_numeric(col_data, errors='coerce')
-            non_null_original = col_data.notna().sum()
-            non_null_converted = col_data_numeric.notna().sum()
-
-            # If we didn't lose too much data (>50%), use numeric version
-            if non_null_converted >= non_null_original * 0.5:
-                col_data = col_data_numeric
-            else:
-                raise ValueError(
-                    f"Column '{request.column}' is not numeric. "
-                    f"Only {non_null_converted}/{non_null_original} values could be converted to numbers."
-                )
-
-        # Check if column is numeric
-        if not pd.api.types.is_numeric_dtype(col_data):
-            raise ValueError(
-                f"Column '{request.column}' must be numeric for statistical analysis. "
-                f"Current type: {col_data.dtype}"
-            )
+        # Ensure column is numeric (with auto-conversion for text-stored numbers)
+        col_data = self._ensure_numeric_column(col_data, request.column)
 
         # Calculate statistics
         null_count = int(col_data.isna().sum())
@@ -185,18 +166,9 @@ class StatisticsOperations(BaseOperations):
         # Select only requested columns
         df_subset = df[request.columns].copy()
 
-        # Convert to numeric, handling text-stored numbers
+        # Ensure all columns are numeric (with auto-conversion for text-stored numbers)
         for col in request.columns:
-            if df_subset[col].dtype == 'object' or df_subset[col].dtype.name == 'string':
-                df_subset[col] = pd.to_numeric(df_subset[col], errors='coerce')
-
-        # Check if all columns are numeric
-        non_numeric = [col for col in request.columns if not pd.api.types.is_numeric_dtype(df_subset[col])]
-        if non_numeric:
-            raise ValueError(
-                f"All columns must be numeric for correlation. "
-                f"Non-numeric columns: {', '.join(non_numeric)}"
-            )
+            df_subset[col] = self._ensure_numeric_column(df_subset[col], col)
 
         # Drop rows with any NaN values
         df_clean = df_subset.dropna()
@@ -275,16 +247,8 @@ class StatisticsOperations(BaseOperations):
         # Get column data
         col_data = df[request.column].copy()
 
-        # Try to convert to numeric if it's object/string type
-        if col_data.dtype == 'object' or col_data.dtype.name == 'string':
-            col_data = pd.to_numeric(col_data, errors='coerce')
-
-        # Check if column is numeric
-        if not pd.api.types.is_numeric_dtype(col_data):
-            raise ValueError(
-                f"Column '{request.column}' must be numeric for outlier detection. "
-                f"Current type: {col_data.dtype}"
-            )
+        # Ensure column is numeric (with auto-conversion for text-stored numbers)
+        col_data = self._ensure_numeric_column(col_data, request.column)
 
         # Remove NaN values for calculation
         non_null_data = col_data.dropna()
