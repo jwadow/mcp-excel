@@ -454,8 +454,8 @@ class FormulaGenerator:
         target_range: Optional[str],
     ) -> str:
         """Generate formula for multiple filter conditions."""
-        # Check if all filters use simple operators
-        simple_operators = ["==", "!=", ">", "<", ">=", "<="]
+        # Operators supported in COUNTIFS/SUMIFS with wildcards
+        simple_operators = ["==", "!=", ">", "<", ">=", "<=", "contains", "startswith", "endswith"]
         
         criteria_ranges = []
         criteria_values = []
@@ -497,6 +497,9 @@ class FormulaGenerator:
             > with 10 → ">10"
             >= with 10 → ">=10"
             >= with date → ">="&DATE(2026,1,1)
+            contains with "ABC" → "*ABC*"
+            startswith with "ABC" → "ABC*"
+            endswith with "ABC" → "*ABC"
         """
         # Handle datetime values specially
         if isinstance(value, pd.Timestamp):
@@ -533,6 +536,27 @@ class FormulaGenerator:
             else:
                 # For numbers: ">10"
                 return f'"{operator}{value}"'
+        
+        elif operator == "contains":
+            # Wildcard pattern: *value*
+            if not isinstance(value, str):
+                value = str(value)
+            escaped = value.replace('"', '""')
+            return f'"*{escaped}*"'
+        
+        elif operator == "startswith":
+            # Wildcard pattern: value*
+            if not isinstance(value, str):
+                value = str(value)
+            escaped = value.replace('"', '""')
+            return f'"{escaped}*"'
+        
+        elif operator == "endswith":
+            # Wildcard pattern: *value
+            if not isinstance(value, str):
+                value = str(value)
+            escaped = value.replace('"', '""')
+            return f'"*{escaped}"'
         
         else:
             # Fallback
