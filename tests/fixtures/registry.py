@@ -132,6 +132,31 @@ NUMERIC_TYPES = FixtureMetadata(
     }
 )
 
+MULTI_SHEET = FixtureMetadata(
+    name="multi_sheet",
+    category="basic",
+    file_name="multi_sheet.xlsx",
+    format="xlsx",
+    sheet_name="Products",  # Default sheet for single-sheet tests
+    header_row=0,
+    columns=["Товар", "Цена", "Категория"],
+    row_count=5,
+    description="File with 3 sheets (Products, Clients, Orders) for multi-sheet testing",
+    tests=[
+        "multi_sheet_operations",
+        "cache_per_sheet",
+        "sheet_navigation",
+        "cross_sheet_operations",
+    ],
+    expected={
+        "sheet_count": 3,
+        "sheet_names": ["Products", "Clients", "Orders"],
+        "products_count": 5,
+        "clients_count": 4,
+        "orders_count": 3,
+    }
+)
+
 # ============================================================================
 # MESSY FIXTURES (Real World)
 # ============================================================================
@@ -427,6 +452,7 @@ FIXTURES: Dict[str, FixtureMetadata] = {
     "simple": SIMPLE,
     "with_dates": WITH_DATES,
     "numeric_types": NUMERIC_TYPES,
+    "multi_sheet": MULTI_SHEET,
     
     # Messy
     "messy_headers": MESSY_HEADERS,

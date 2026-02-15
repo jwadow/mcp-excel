@@ -43,8 +43,8 @@ def test_registry_metadata():
     print("\n🔍 Checking registry metadata...")
     
     # Check total count
-    assert len(FIXTURES) == 16, f"Expected 16 fixtures, got {len(FIXTURES)}"
-    print(f"  ✅ Registry has 16 fixtures")
+    assert len(FIXTURES) == 17, f"Expected 17 fixtures, got {len(FIXTURES)}"
+    print(f"  ✅ Registry has 17 fixtures")
     
     # Check categories
     basic = get_fixtures_by_category("basic")
@@ -52,7 +52,7 @@ def test_registry_metadata():
     edge = get_fixtures_by_category("edge_cases")
     legacy = get_fixtures_by_category("legacy")
     
-    assert len(basic) == 3, f"Expected 3 basic fixtures, got {len(basic)}"
+    assert len(basic) == 4, f"Expected 4 basic fixtures, got {len(basic)}"
     assert len(messy) == 4, f"Expected 4 messy fixtures, got {len(messy)}"
     assert len(edge) == 8, f"Expected 8 edge case fixtures, got {len(edge)}"
     assert len(legacy) == 1, f"Expected 1 legacy fixture, got {len(legacy)}"

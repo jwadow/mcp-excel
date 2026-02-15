@@ -584,6 +584,54 @@ class ExcelFixtureBuilder:
         wb.save(output_path)
         return output_path
 
+    def create_multi_sheet_xlsx(self) -> Path:
+        """Creates file with multiple sheets for multi-sheet testing.
+        
+        Tests multi-sheet operations and cache separation.
+        """
+        wb = openpyxl.Workbook()
+        
+        # Sheet 1: Products
+        ws1 = wb.active
+        ws1.title = "Products"
+        ws1.append(["Товар", "Цена", "Категория"])
+        products = [
+            ["Ноутбук", 50000, "Электроника"],
+            ["Мышь", 1500, "Электроника"],
+            ["Стол", 15000, "Мебель"],
+            ["Стул", 5000, "Мебель"],
+            ["Книга", 500, "Книги"],
+        ]
+        for row in products:
+            ws1.append(row)
+        
+        # Sheet 2: Clients
+        ws2 = wb.create_sheet("Clients")
+        ws2.append(["Клиент", "Город", "Рейтинг"])
+        clients = [
+            ["Ромашка", "Москва", 5],
+            ["Лютик", "Санкт-Петербург", 4],
+            ["Василёк", "Казань", 5],
+            ["Одуванчик", "Екатеринбург", 3],
+        ]
+        for row in clients:
+            ws2.append(row)
+        
+        # Sheet 3: Orders
+        ws3 = wb.create_sheet("Orders")
+        ws3.append(["Номер", "Клиент", "Товар", "Количество"])
+        orders = [
+            ["ЗАК-001", "Ромашка", "Ноутбук", 2],
+            ["ЗАК-002", "Лютик", "Мышь", 5],
+            ["ЗАК-003", "Василёк", "Стол", 1],
+        ]
+        for row in orders:
+            ws3.append(row)
+        
+        output_path = self.basic_dir / "multi_sheet.xlsx"
+        wb.save(output_path)
+        return output_path
+
     def create_simple_xls(self) -> Path:
         """Creates simple table in legacy .xls format.
         
@@ -646,6 +694,9 @@ def main():
 
     fixtures_created.append(("numeric_types.xlsx", builder.create_numeric_types_xlsx()))
     print(f"  ✅ numeric_types.xlsx - different numeric types (int, float)")
+    
+    fixtures_created.append(("multi_sheet.xlsx", builder.create_multi_sheet_xlsx()))
+    print(f"  ✅ multi_sheet.xlsx - file with 3 sheets (Products, Clients, Orders)")
 
     # Messy fixtures (real world)
     print("\n2️⃣ Messy fixtures (real world scenarios):")

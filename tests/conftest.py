@@ -104,6 +104,12 @@ def numeric_types_fixture() -> FixtureMetadata:
 
 
 @pytest.fixture
+def multi_sheet_fixture() -> FixtureMetadata:
+    """File with 3 sheets (Products, Clients, Orders)."""
+    return get_fixture("multi_sheet")
+
+
+@pytest.fixture
 def messy_headers_fixture() -> FixtureMetadata:
     """Table with headers from row 4, junk above."""
     return get_fixture("messy_headers")
