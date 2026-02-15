@@ -35,6 +35,7 @@ from mcp_excel.models.requests import (
     FindNullsRequest,
     GetColumnNamesRequest,
     GetColumnStatsRequest,
+    GetDataProfileRequest,
     GetSheetInfoRequest,
     GetUniqueValuesRequest,
     GetValueCountsRequest,
@@ -171,6 +172,77 @@ def test_inspection_operations(file_path: str) -> None:
             else:
                 # Show only first 3 columns for other rows
                 print(f"    Row {idx}: {dict(list(row.items())[:3])}...")
+
+        # Test get_data_profile
+        print(f"\n\n🔍 Test: Getting data profile for columns...")
+        try:
+            # Profile first 3 columns
+            columns_to_profile = response.column_names[:min(3, len(response.column_names))]
+            print(f"  Profiling columns: {', '.join(columns_to_profile)}")
+            
+            request = GetDataProfileRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                columns=columns_to_profile,
+                top_n=5
+            )
+            response = ops.get_data_profile(request)
+            
+            print(f"  ✅ Profiled {response.columns_profiled} column(s)")
+            
+            for col_name, profile in response.profiles.items():
+                print(f"\n  Column: '{col_name}'")
+                print(f"    Type: {profile.data_type}")
+                print(f"    Total count: {profile.total_count}")
+                print(f"    Null count: {profile.null_count} ({profile.null_percentage}%)")
+                print(f"    Unique values: {profile.unique_count}")
+                
+                if profile.stats:
+                    print(f"    Statistics:")
+                    print(f"      Min: {profile.stats.min}")
+                    print(f"      Max: {profile.stats.max}")
+                    print(f"      Mean: {profile.stats.mean:.2f}")
+                    print(f"      Median: {profile.stats.median:.2f}")
+                
+                if profile.top_values:
+                    print(f"    Top values:")
+                    for val_info in profile.top_values[:3]:
+                        print(f"      {val_info['value']}: {val_info['count']} ({val_info['percentage']}%)")
+            
+            print(f"\n  📋 TSV Output (first 200 chars):")
+            print(f"    {response.excel_output.tsv[:200]}...")
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
+
+        # Test get_data_profile with all columns
+        print(f"\n\n🔍 Test: Getting data profile for ALL columns...")
+        try:
+            request = GetDataProfileRequest(
+                file_path=file_path,
+                sheet_name=sheet_name,
+                columns=None,  # Profile all columns
+                top_n=3
+            )
+            response = ops.get_data_profile(request)
+            
+            print(f"  ✅ Profiled {response.columns_profiled} column(s) (all columns)")
+            print(f"  Column types distribution:")
+            
+            type_counts = {}
+            for profile in response.profiles.values():
+                type_counts[profile.data_type] = type_counts.get(profile.data_type, 0) + 1
+            
+            for dtype, count in type_counts.items():
+                print(f"    {dtype}: {count} column(s)")
+            
+            print(f"\n  Sample column profiles (first 2):")
+            for idx, (col_name, profile) in enumerate(list(response.profiles.items())[:2], 1):
+                print(f"    {idx}. '{col_name}' ({profile.data_type}): {profile.unique_count} unique, {profile.null_count} nulls")
+            
+            print(f"  ⚡ Execution time: {response.performance.execution_time_ms}ms")
+        except Exception as e:
+            print(f"  ❌ Error: {e}")
 
 
 def test_data_operations(file_path: str) -> None:

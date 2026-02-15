@@ -30,6 +30,7 @@ from .models.requests import (
     FindNullsRequest,
     GetColumnNamesRequest,
     GetColumnStatsRequest,
+    GetDataProfileRequest,
     GetSheetInfoRequest,
     GetUniqueValuesRequest,
     GetValueCountsRequest,
@@ -126,6 +127,38 @@ class MCPExcelServer:
                             "sheet_name": {
                                 "type": "string",
                                 "description": "Name of the sheet",
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name"],
+                    },
+                ),
+                Tool(
+                    name="get_data_profile",
+                    description="Get comprehensive data profile for columns including type, statistics, null counts, and top values. Combines multiple operations (get_column_stats, get_value_counts, find_nulls) into a single efficient call. Ideal for initial data exploration and understanding column characteristics.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "columns": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Columns to profile (optional, profiles all columns if not specified)",
+                            },
+                            "top_n": {
+                                "type": "integer",
+                                "description": "Number of top values to return per column (default: 5)",
+                                "default": 5,
                             },
                             "header_row": {
                                 "type": "integer",
@@ -1034,6 +1067,11 @@ class MCPExcelServer:
                 elif name == "get_column_names":
                     request = GetColumnNamesRequest(**arguments)
                     response = self.inspection_ops.get_column_names(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "get_data_profile":
+                    request = GetDataProfileRequest(**arguments)
+                    response = self.inspection_ops.get_data_profile(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 elif name == "find_column":

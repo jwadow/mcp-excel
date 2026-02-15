@@ -9,7 +9,7 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/tools-22-orange.svg)](#available-tools)
+[![Tools](https://img.shields.io/badge/tools-23-orange.svg)](#available-tools)
 [![Sponsor](https://img.shields.io/badge/💖_Sponsor-Support_Development-ff69b4)](#-support-the-project)
 
 Enables AI agents to analyze Excel files through composable operations without loading raw data into context
@@ -207,7 +207,38 @@ Quick operation to get just the column names.
 
 </details>
 
-### 4. `get_unique_values`
+### 4. `get_data_profile`
+
+Get comprehensive data profile for columns including type, statistics, null counts, and top values.
+
+<details>
+<summary>View Input/Output</summary>
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "columns": ["Price", "Quantity", "Status"],
+  "top_n": 5
+}
+```
+
+**Output:**
+- Column profiles with:
+  - Data type (integer, float, string, datetime, boolean)
+  - Total count, null count, null percentage
+  - Unique value count
+  - Statistical summary (for numeric columns): min, max, mean, median, std, quartiles
+  - Top N most frequent values with counts and percentages
+- TSV output for Excel
+- Performance metrics
+
+**Use case:** Combines multiple operations (get_column_stats, get_value_counts, find_nulls) into a single efficient call. Ideal for initial data exploration - get complete picture of your data in one request instead of 10+ separate calls.
+
+</details>
+
+### 5. `get_unique_values`
 
 Get unique values from a column (useful for building filters).
 

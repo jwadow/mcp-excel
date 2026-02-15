@@ -14,15 +14,19 @@ from ..models.requests import (
     CompareSheetsRequest,
     FindColumnRequest,
     GetColumnNamesRequest,
+    GetDataProfileRequest,
     GetSheetInfoRequest,
     InspectFileRequest,
     SearchAcrossSheetsRequest,
 )
 from ..models.responses import (
+    ColumnProfile,
+    ColumnStats,
     CompareSheetsResponse,
     ExcelOutput,
     FindColumnResponse,
     GetColumnNamesResponse,
+    GetDataProfileResponse,
     GetSheetInfoResponse,
     HeaderDetectionInfo,
     InspectFileResponse,
@@ -498,3 +502,138 @@ class InspectionOperations(BaseOperations):
         )
 
         return response
+
+    def get_data_profile(
+        self, request: GetDataProfileRequest
+    ) -> GetDataProfileResponse:
+        """Get data profile for columns.
+
+        Args:
+            request: Data profile request
+
+        Returns:
+            Data profile response with statistics and top values
+        """
+        start_time = time.time()
+
+        # Load DataFrame with header detection
+        df, _ = self._load_with_header_detection(
+            request.file_path, request.sheet_name, request.header_row
+        )
+
+        # Determine which columns to profile
+        if request.columns:
+            # Validate requested columns
+            missing_cols = set(request.columns) - set(df.columns)
+            if missing_cols:
+                available = ", ".join(str(col) for col in df.columns)
+                raise ValueError(
+                    f"Columns not found: {', '.join(missing_cols)}. Available: {available}"
+                )
+            columns_to_profile = request.columns
+        else:
+            # Profile all columns
+            columns_to_profile = list(df.columns)
+
+        # Build profiles for each column
+        profiles = {}
+        for col in columns_to_profile:
+            col_str = str(col)
+            col_data = df[col]
+
+            # Determine data type
+            if pd.api.types.is_datetime64_any_dtype(col_data):
+                data_type = "datetime"
+            elif pd.api.types.is_integer_dtype(col_data):
+                data_type = "integer"
+            elif pd.api.types.is_float_dtype(col_data):
+                data_type = "float"
+            elif pd.api.types.is_bool_dtype(col_data):
+                data_type = "boolean"
+            else:
+                data_type = "string"
+
+            # Basic counts
+            total_count = len(col_data)
+            null_count = int(col_data.isna().sum())
+            null_percentage = round((null_count / total_count * 100) if total_count > 0 else 0.0, 2)
+            unique_count = int(col_data.dropna().nunique())
+
+            # Statistical summary (for numeric columns only)
+            stats = None
+            if data_type in ["integer", "float"]:
+                non_null_data = col_data.dropna()
+                if len(non_null_data) > 0:
+                    stats = ColumnStats(
+                        count=int(len(non_null_data)),
+                        mean=float(non_null_data.mean()),
+                        median=float(non_null_data.median()),
+                        std=float(non_null_data.std()) if len(non_null_data) > 1 else 0.0,
+                        min=self._format_value(non_null_data.min()),
+                        max=self._format_value(non_null_data.max()),
+                        q25=float(non_null_data.quantile(0.25)),
+                        q75=float(non_null_data.quantile(0.75)),
+                        null_count=null_count,
+                    )
+
+            # Top N most frequent values
+            value_counts = col_data.value_counts().head(request.top_n)
+            top_values = [
+                {
+                    "value": self._format_value(val),
+                    "count": int(count),
+                    "percentage": round((count / total_count * 100) if total_count > 0 else 0.0, 2)
+                }
+                for val, count in value_counts.items()
+            ]
+
+            # Create column profile
+            profiles[col_str] = ColumnProfile(
+                column_name=col_str,
+                data_type=data_type,
+                total_count=total_count,
+                null_count=null_count,
+                null_percentage=null_percentage,
+                unique_count=unique_count,
+                stats=stats,
+                top_values=top_values,
+            )
+
+        # Generate TSV output
+        tsv_rows = []
+        tsv_rows.append(["Column", "Type", "Total", "Nulls", "Null%", "Unique", "Top Value", "Top Count"])
+        
+        for col_name, profile in profiles.items():
+            top_val = profile.top_values[0]["value"] if profile.top_values else "N/A"
+            top_count = profile.top_values[0]["count"] if profile.top_values else 0
+            
+            tsv_rows.append([
+                col_name,
+                profile.data_type,
+                profile.total_count,
+                profile.null_count,
+                f"{profile.null_percentage}%",
+                profile.unique_count,
+                str(top_val),
+                top_count,
+            ])
+
+        from ..excel.tsv_formatter import TSVFormatter
+        tsv_formatter = TSVFormatter()
+        tsv = tsv_formatter.format_table(tsv_rows[0], tsv_rows[1:])
+
+        excel_output = ExcelOutput(tsv=tsv, formula=None, references=None)
+
+        metadata = self._get_file_metadata(request.file_path, request.sheet_name)
+        metadata.rows_total = len(df)
+        metadata.columns_total = len(df.columns)
+
+        performance = self._get_performance_metrics(start_time, len(df), True)
+
+        return GetDataProfileResponse(
+            profiles=profiles,
+            columns_profiled=len(profiles),
+            excel_output=excel_output,
+            metadata=metadata,
+            performance=performance,
+        )

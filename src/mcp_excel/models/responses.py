@@ -308,6 +308,29 @@ class CalculateExpressionResponse(BaseModel):
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
 
+class ColumnProfile(BaseModel):
+    """Profile information for a single column."""
+
+    column_name: str = Field(description="Column name")
+    data_type: str = Field(description="Data type (integer, float, string, datetime, boolean)")
+    total_count: int = Field(description="Total number of values (including nulls)")
+    null_count: int = Field(description="Number of null values")
+    null_percentage: float = Field(description="Percentage of null values")
+    unique_count: int = Field(description="Number of unique non-null values")
+    stats: Optional[ColumnStats] = Field(default=None, description="Statistical summary (for numeric columns only)")
+    top_values: list[dict[str, Any]] = Field(description="Top N most frequent values with counts")
+
+
+class GetDataProfileResponse(BaseModel):
+    """Response for data profiling."""
+
+    profiles: dict[str, ColumnProfile] = Field(description="Column profiles (column name -> profile)")
+    columns_profiled: int = Field(description="Number of columns profiled")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
 class ErrorResponse(BaseModel):
     """Error response."""
 

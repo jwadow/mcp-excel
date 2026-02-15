@@ -267,3 +267,13 @@ class CalculateExpressionRequest(BaseModel):
     filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class GetDataProfileRequest(BaseModel):
+    """Request to get data profile for columns."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    columns: Optional[list[str]] = Field(default=None, description="Columns to profile (None = all columns)")
+    top_n: int = Field(default=5, description="Number of top values to return per column")
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
