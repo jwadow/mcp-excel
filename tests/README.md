@@ -476,8 +476,7 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/fixtures/performance/large_50k.xlsx` - ✅ DONE - 50,000 rows fixture for aggregation stress tests
 - `tests/fixtures/performance/large_100k.xlsx` - ✅ DONE - 100,000 rows fixture for statistics and filtering stress tests
 - `tests/integration/test_edge_cases.py` - ✅ DONE (15 tests) - merged cells handling (horizontal/vertical merges, title rows), multi-level headers detection (2-level, 3-level hierarchies), enterprise chaos (worst-case scenarios with junk+merged+multi-level), cross-operation validation, error messages quality
-- `tests/integration/test_performance.py` - ⏳ TODO - performance tests with large files for all major operations: filtering (10k rows), aggregation (50k rows), statistics (100k rows), cache performance, memory usage
-- `tests/integration/test_error_handling.py` - ⏳ TODO - corrupted Excel files, invalid file formats (.txt, .pdf as .xlsx), missing/renamed columns mid-operation, invalid operators, malformed datetime values, circular formula references
+- `tests/integration/test_error_handling.py` - ✅ DONE (22 tests) - file system errors (not found, invalid formats, corrupted files), column validation errors (missing columns in operations), filter validation errors (invalid operators, missing parameters, invalid regex), data type errors (non-numeric aggregation), context overflow errors (response size limits), multi-sheet operation errors (missing key columns), sheet validation errors (non-existent sheets, empty sheets), error message quality verification
 
 ### Coverage Goals
 
