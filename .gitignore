@@ -41,11 +41,19 @@ desktop.ini
 
 # Project-specific
 _notes/
+test_data/
+sample_files/
+
+# Excel files (ignore everywhere except test fixtures)
 *.xls
 *.xlsx
 *.xlsm
-test_data/
-sample_files/
+!tests/fixtures/**/*.xls
+!tests/fixtures/**/*.xlsx
+!tests/fixtures/**/*.xlsm
+
+# Excel temp files (created when file is open)
+~$*.xls*
 
 # Logs
 *.log
