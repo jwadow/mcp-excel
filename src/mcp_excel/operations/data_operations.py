@@ -426,7 +426,7 @@ class DataOperations(BaseOperations):
             elif operation == "var":
                 result = float(col_data.var())
             elif operation == "count":
-                result = float(len(col_data))
+                result = len(col_data)
             else:
                 raise ValueError(f"Unsupported operation: {operation}")
         except (TypeError, ValueError) as e:
@@ -542,12 +542,13 @@ class DataOperations(BaseOperations):
                 raise ValueError(error_msg)
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
-        # Try to convert aggregation column to numeric if needed
-        if df[request.agg_column].dtype == 'object' or df[request.agg_column].dtype.name == 'string':
-            df[request.agg_column] = pd.to_numeric(df[request.agg_column], errors='coerce')
-
         # Perform group-by aggregation
         operation = request.agg_operation
+        
+        # Try to convert aggregation column to numeric if needed (only for numeric operations)
+        if operation != "count":
+            if df[request.agg_column].dtype == 'object' or df[request.agg_column].dtype.name == 'string':
+                df[request.agg_column] = pd.to_numeric(df[request.agg_column], errors='coerce')
         try:
             if operation == "sum":
                 grouped = df.groupby(request.group_columns)[request.agg_column].sum()

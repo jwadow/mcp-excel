@@ -291,6 +291,16 @@ class FormulaGenerator:
                 return f"=SUM({target_range})"
             elif operation == "mean" and target_range:
                 return f"=AVERAGE({target_range})"
+            elif operation == "median" and target_range:
+                return f"=MEDIAN({target_range})"
+            elif operation == "min" and target_range:
+                return f"=MIN({target_range})"
+            elif operation == "max" and target_range:
+                return f"=MAX({target_range})"
+            elif operation == "std" and target_range:
+                return f"=STDEV({target_range})"
+            elif operation == "var" and target_range:
+                return f"=VAR({target_range})"
             else:
                 raise ValueError(f"Operation {operation} requires filters or target range")
 

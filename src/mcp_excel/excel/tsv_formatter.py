@@ -1,3 +1,8 @@
+# Excel MCP Server
+# Copyright (C) 2026 Jwadow
+# Licensed under AGPL-3.0
+# https://github.com/jwadow/mcp-excel
+
 """TSV formatter for Excel copy-paste functionality."""
 
 from typing import Any
@@ -43,7 +48,7 @@ class TSVFormatter:
             TSV-formatted string
         """
         if formula:
-            return f"{label}\t{formula}"
+            return f"{label}\t{self._format_cell(value)}\t{formula}"
         else:
             return f"{label}\t{self._format_cell(value)}"
 

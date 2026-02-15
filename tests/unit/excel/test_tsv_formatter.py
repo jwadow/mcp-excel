@@ -129,7 +129,7 @@ def test_format_single_value_with_formula():
     
     tsv = formatter.format_single_value("Total", 12345, formula="=SUM(A1:A10)")
     
-    assert tsv == "Total\t=SUM(A1:A10)", "Should use formula instead of value"
+    assert tsv == "Total\t12345\t=SUM(A1:A10)", "Should include both value and formula"
     print(f"✅ Single value with formula formatted: {tsv}")
 
 
