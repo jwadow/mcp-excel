@@ -144,18 +144,9 @@ class InspectionOperations(BaseOperations):
         sample_rows = []
         for idx in range(min(3, len(df))):
             row_dict = df.iloc[idx].to_dict()
-            # Convert to JSON-serializable types with string keys
-            # CRITICAL: Convert datetime values to ISO 8601 strings for agent
-            serialized_row = {}
-            for k, v in row_dict.items():
-                key = str(k)
-                if pd.isna(v):
-                    serialized_row[key] = None
-                elif pd.api.types.is_datetime64_any_dtype(type(v)) or isinstance(v, pd.Timestamp):
-                    # Convert datetime to ISO 8601 string
-                    serialized_row[key] = v.isoformat()
-                else:
-                    serialized_row[key] = v
+            # Convert to JSON-serializable types with string keys and format values
+            # Use _format_value() to handle numpy types, datetime, and other conversions
+            serialized_row = {str(k): self._format_value(v) for k, v in row_dict.items()}
             sample_rows.append(serialized_row)
 
         metadata = self._get_file_metadata(request.file_path, request.sheet_name)

@@ -40,6 +40,7 @@ class BaseOperations:
         """Format value for natural display to agent/user.
         
         Converts values to JSON-serializable types:
+        - NumPy scalar types (int64, float64, etc.) -> Python native types
         - Floats without decimal parts -> ints
         - Datetime values -> ISO 8601 strings
         - NaN/NaT -> None
@@ -52,6 +53,10 @@ class BaseOperations:
         """
         if pd.isna(value):
             return None
+        # Handle numpy scalar types (int8, int16, int32, int64, float32, float64, etc.)
+        # All numpy scalars have .item() method to convert to Python native types
+        elif hasattr(value, 'item'):
+            return value.item()
         elif isinstance(value, (pd.Timestamp, pd.DatetimeTZDtype)):
             # Convert datetime to ISO 8601 string for agent
             return value.isoformat()

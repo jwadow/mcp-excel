@@ -257,7 +257,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -320,7 +320,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -377,7 +377,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -439,7 +439,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -491,7 +491,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -550,7 +550,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -758,7 +758,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -819,7 +819,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -879,7 +879,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -946,7 +946,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -1002,7 +1002,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining filters (default: AND)",
+                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
                                 "default": "AND",
                             },
                             "header_row": {
