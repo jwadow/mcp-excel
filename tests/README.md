@@ -449,7 +449,7 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/unit/excel/test_tsv_formatter.py` - ✅ DONE (26 tests)
 
 **Priority 2: Operations (Integration Tests)**
-- `tests/integration/test_file_inspection.py` - inspect_file, get_sheet_info, get_column_names, get_data_profile
+- `tests/integration/test_file_inspection.py` - ✅ DONE (37 tests) - inspect_file, get_sheet_info, get_column_names, get_data_profile
 - `tests/integration/test_data_retrieval.py` - get_unique_values, get_value_counts, filter_and_get_rows
 - `tests/integration/test_filtering_and_counting.py` - filter_and_count with ALL 12 operators
 - `tests/integration/test_aggregation.py` - aggregate (8 operations), group_by
