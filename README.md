@@ -137,9 +137,9 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 
 **Important:** Replace `C:/Users/YourName/Documents/data.xlsx` with the actual path to your Excel file.
 
-## Available Tools
+## Available Tools (23)
 
-### 1. `inspect_file`
+### `inspect_file`
 
 Get basic information about Excel file structure.
 
@@ -161,7 +161,7 @@ Get basic information about Excel file structure.
 
 </details>
 
-### 2. `get_sheet_info`
+### `get_sheet_info`
 
 Get detailed information about a specific sheet.
 
@@ -186,7 +186,7 @@ Get detailed information about a specific sheet.
 
 </details>
 
-### 3. `get_column_names`
+### `get_column_names`
 
 Quick operation to get just the column names.
 
@@ -207,7 +207,7 @@ Quick operation to get just the column names.
 
 </details>
 
-### 4. `get_data_profile`
+### `get_data_profile`
 
 Get comprehensive data profile for columns including type, statistics, null counts, and top values.
 
@@ -238,7 +238,7 @@ Get comprehensive data profile for columns including type, statistics, null coun
 
 </details>
 
-### 5. `get_unique_values`
+### `get_unique_values`
 
 Get unique values from a column (useful for building filters).
 
@@ -262,7 +262,7 @@ Get unique values from a column (useful for building filters).
 
 </details>
 
-### 5. `get_value_counts`
+### `get_value_counts`
 
 Get frequency counts for values in a column (top N most common).
 
@@ -286,7 +286,7 @@ Get frequency counts for values in a column (top N most common).
 
 </details>
 
-### 6. `filter_and_count`
+### `filter_and_count`
 
 Count rows matching filter conditions.
 
@@ -315,7 +315,7 @@ Count rows matching filter conditions.
 
 </details>
 
-### 7. `filter_and_get_rows`
+### `filter_and_get_rows`
 
 Get rows matching filter conditions with pagination.
 
@@ -345,7 +345,7 @@ Get rows matching filter conditions with pagination.
 
 </details>
 
-### 8. `aggregate`
+### `aggregate`
 
 Perform aggregation (sum, mean, count, etc.) on a column with optional filters.
 
@@ -376,7 +376,7 @@ Perform aggregation (sum, mean, count, etc.) on a column with optional filters.
 
 </details>
 
-### 9. `group_by`
+### `group_by`
 
 Group data by columns and perform aggregation (like Excel Pivot Table).
 
@@ -401,7 +401,7 @@ Group data by columns and perform aggregation (like Excel Pivot Table).
 
 </details>
 
-### 10. `find_column`
+### `find_column`
 
 Find a column across all sheets or in a specific sheet.
 
@@ -424,7 +424,7 @@ Find a column across all sheets or in a specific sheet.
 
 </details>
 
-### 11. `search_across_sheets`
+### `search_across_sheets`
 
 Search for a specific value across all sheets in the file.
 
@@ -448,7 +448,7 @@ Search for a specific value across all sheets in the file.
 
 </details>
 
-### 12. `compare_sheets`
+### `compare_sheets`
 
 Compare data between two sheets using a key column.
 
@@ -474,7 +474,7 @@ Compare data between two sheets using a key column.
 
 </details>
 
-### 13. `get_column_stats`
+### `get_column_stats`
 
 Get statistical summary of a column.
 
@@ -498,7 +498,7 @@ Get statistical summary of a column.
 
 </details>
 
-### 14. `correlate`
+### `correlate`
 
 Calculate correlation matrix between multiple columns.
 
@@ -523,7 +523,7 @@ Calculate correlation matrix between multiple columns.
 
 </details>
 
-### 15. `detect_outliers`
+### `detect_outliers`
 
 Detect outliers in a column using IQR or Z-score method.
 
@@ -549,7 +549,7 @@ Detect outliers in a column using IQR or Z-score method.
 
 </details>
 
-### 16. `find_duplicates`
+### `find_duplicates`
 
 Find duplicate rows based on specified columns.
 
@@ -576,7 +576,7 @@ Find duplicate rows based on specified columns.
 
 </details>
 
-### 17. `find_nulls`
+### `find_nulls`
 
 Find null/empty values in specified columns with detailed statistics.
 
@@ -600,7 +600,7 @@ Find null/empty values in specified columns with detailed statistics.
 
 </details>
 
-### 18. `calculate_period_change`
+### `calculate_period_change`
 
 Calculate period-over-period change (month/quarter/year growth).
 
@@ -629,7 +629,7 @@ Calculate period-over-period change (month/quarter/year growth).
 
 </details>
 
-### 19. `calculate_running_total`
+### `calculate_running_total`
 
 Calculate running total (cumulative sum) ordered by a column.
 
@@ -657,7 +657,7 @@ Calculate running total (cumulative sum) ordered by a column.
 
 </details>
 
-### 20. `calculate_moving_average`
+### `calculate_moving_average`
 
 Calculate moving average with specified window size.
 
@@ -684,7 +684,7 @@ Calculate moving average with specified window size.
 
 </details>
 
-### 21. `rank_rows`
+### `rank_rows`
 
 Rank rows by column value (ascending or descending).
 
@@ -714,7 +714,7 @@ Rank rows by column value (ascending or descending).
 
 </details>
 
-### 22. `calculate_expression`
+### `calculate_expression`
 
 Calculate expression between columns (arithmetic operations).
 
