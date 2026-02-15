@@ -16,13 +16,18 @@ FileLoader -> HeaderDetector -> Operations -> Response
 """
 
 import pytest
+import openpyxl
 
 from mcp_excel.operations.inspection import InspectionOperations
+from mcp_excel.operations.base import MAX_DIFFERENCES
 from mcp_excel.models.requests import (
     InspectFileRequest,
     GetSheetInfoRequest,
     GetColumnNamesRequest,
     GetDataProfileRequest,
+    FindColumnRequest,
+    SearchAcrossSheetsRequest,
+    CompareSheetsRequest,
 )
 
 
@@ -1167,3 +1172,589 @@ def test_get_data_profile_invalid_column(simple_fixture, file_loader):
     
     assert "not found" in str(exc_info.value).lower(), "Error should mention column not found"
     assert "NonExistentColumn" in str(exc_info.value), "Error should mention the invalid column name"
+
+
+# ============================================================================
+# Exception Handling Tests (lines 78-79, 257-258, 329-330)
+# ============================================================================
+
+def test_inspect_file_with_corrupted_sheet(temp_excel_path, file_loader):
+    """Test inspect_file handles corrupted/unreadable sheets gracefully.
+    
+    Covers lines 78-79: Exception handling in inspect_file()
+    
+    Verifies:
+    - Returns error info for corrupted sheet
+    - Continues processing other sheets
+    - Doesn't crash the entire operation
+    """
+    print(f"\n📂 Testing inspect_file with corrupted sheet")
+    
+    # Create file with one good sheet and one that will fail to load
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "GoodSheet"
+    ws1.append(["Column1", "Column2"])
+    ws1.append([1, 2])
+    
+    # Create another sheet
+    ws2 = wb.create_sheet("BadSheet")
+    ws2.append(["A", "B"])
+    ws2.append([1, 2])
+    
+    file_path = temp_excel_path / "corrupted.xlsx"
+    wb.save(file_path)
+    
+    # Mock the loader to simulate corruption on second sheet
+    original_load = file_loader.load
+    def mock_load(path, sheet, **kwargs):
+        if sheet == "BadSheet":
+            raise ValueError("Simulated corruption: Cannot read sheet")
+        return original_load(path, sheet, **kwargs)
+    
+    file_loader.load = mock_load
+    
+    try:
+        ops = InspectionOperations(file_loader)
+        request = InspectFileRequest(file_path=str(file_path))
+        
+        # Act
+        response = ops.inspect_file(request)
+        
+        # Assert
+        print(f"✅ Sheet count: {response.sheet_count}")
+        print(f"   Sheets info: {len(response.sheets_info)}")
+        
+        assert response.sheet_count == 2, "Should report both sheets"
+        assert len(response.sheets_info) == 2, "Should have info for both sheets"
+        
+        # Check that one sheet has error
+        error_sheets = [s for s in response.sheets_info if "error" in s]
+        good_sheets = [s for s in response.sheets_info if "error" not in s]
+        
+        print(f"   Good sheets: {len(good_sheets)}")
+        print(f"   Error sheets: {len(error_sheets)}")
+        
+        assert len(error_sheets) == 1, "Should have 1 sheet with error"
+        assert len(good_sheets) == 1, "Should have 1 good sheet"
+        
+        # Check error message
+        error_sheet = error_sheets[0]
+        assert error_sheet["sheet_name"] == "BadSheet"
+        assert "corruption" in error_sheet["error"].lower() or "cannot read" in error_sheet["error"].lower()
+        
+        # Check good sheet
+        good_sheet = good_sheets[0]
+        assert good_sheet["sheet_name"] == "GoodSheet"
+        assert good_sheet["row_count"] > 0
+        assert good_sheet["column_count"] > 0
+        
+    finally:
+        # Restore original load method
+        file_loader.load = original_load
+
+
+def test_find_column_with_error_in_sheet(temp_excel_path, file_loader):
+    """Test find_column continues when one sheet fails to load.
+    
+    Covers lines 257-258: Exception handling in find_column()
+    
+    Verifies:
+    - Skips sheets that fail to load
+    - Returns results from sheets that loaded successfully
+    - Doesn't crash the entire search
+    """
+    print(f"\n📂 Testing find_column with sheet loading error")
+    
+    # Create file with multiple sheets
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["Name", "Age", "City"])
+    ws1.append(["Alice", 25, "Moscow"])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["Name", "Salary"])
+    ws2.append(["Bob", 50000])
+    
+    ws3 = wb.create_sheet("Sheet3")
+    ws3.append(["Product", "Price"])
+    ws3.append(["Laptop", 1000])
+    
+    file_path = temp_excel_path / "multi_sheet.xlsx"
+    wb.save(file_path)
+    
+    # Mock loader to fail on Sheet2
+    original_load = file_loader.load
+    def mock_load(path, sheet, **kwargs):
+        if sheet == "Sheet2":
+            raise RuntimeError("Simulated error loading Sheet2")
+        return original_load(path, sheet, **kwargs)
+    
+    file_loader.load = mock_load
+    
+    try:
+        ops = InspectionOperations(file_loader)
+        request = FindColumnRequest(
+            file_path=str(file_path),
+            column_name="Name",
+            search_all_sheets=True
+        )
+        
+        # Act
+        response = ops.find_column(request)
+        
+        # Assert
+        print(f"✅ Total matches: {response.total_matches}")
+        print(f"   Found in sheets: {[m['sheet'] for m in response.found_in]}")
+        
+        # Should find "Name" in Sheet1 and Sheet2 (Sheet2 fails, so only Sheet1)
+        assert response.total_matches == 1, "Should find column in 1 sheet (Sheet2 failed)"
+        assert len(response.found_in) == 1
+        assert response.found_in[0]["sheet"] == "Sheet1"
+        assert response.found_in[0]["column_name"] == "Name"
+        
+    finally:
+        file_loader.load = original_load
+
+
+def test_search_across_sheets_with_error(temp_excel_path, file_loader):
+    """Test search_across_sheets continues when one sheet fails.
+    
+    Covers lines 329-330: Exception handling in search_across_sheets()
+    
+    Verifies:
+    - Skips sheets that fail to load
+    - Returns matches from successful sheets
+    - Total matches count is correct
+    """
+    print(f"\n📂 Testing search_across_sheets with sheet error")
+    
+    # Create file with multiple sheets
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["Customer", "Amount"])
+    ws1.append(["Alice", 100])
+    ws1.append(["Bob", 200])
+    ws1.append(["Alice", 150])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["Customer", "Orders"])
+    ws2.append(["Alice", 5])
+    ws2.append(["Charlie", 3])
+    
+    file_path = temp_excel_path / "search_test.xlsx"
+    wb.save(file_path)
+    
+    # Mock loader to fail on Sheet2
+    original_load = file_loader.load
+    def mock_load(path, sheet, **kwargs):
+        if sheet == "Sheet2":
+            raise IOError("Simulated I/O error")
+        return original_load(path, sheet, **kwargs)
+    
+    file_loader.load = mock_load
+    
+    try:
+        ops = InspectionOperations(file_loader)
+        request = SearchAcrossSheetsRequest(
+            file_path=str(file_path),
+            column_name="Customer",
+            value="Alice"
+        )
+        
+        # Act
+        response = ops.search_across_sheets(request)
+        
+        # Assert
+        print(f"✅ Total matches: {response.total_matches}")
+        print(f"   Matches: {response.matches}")
+        
+        # Should find "Alice" only in Sheet1 (2 times)
+        assert response.total_matches == 2, "Should find 2 matches in Sheet1"
+        assert len(response.matches) == 1, "Should have results from 1 sheet"
+        assert response.matches[0]["sheet"] == "Sheet1"
+        assert response.matches[0]["match_count"] == 2
+        
+    finally:
+        file_loader.load = original_load
+
+
+# ============================================================================
+# Validation Tests in compare_sheets (lines 382-402)
+# ============================================================================
+
+def test_compare_sheets_missing_key_column_sheet1(temp_excel_path, file_loader):
+    """Test compare_sheets raises error when key_column missing in sheet1.
+    
+    Covers lines 382-386: Validation for key_column in sheet1
+    
+    Verifies:
+    - Raises ValueError with helpful message
+    - Lists available columns
+    """
+    print(f"\n📂 Testing compare_sheets with missing key_column in sheet1")
+    
+    # Create multi-sheet file
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["Name", "Age"])  # No "ID" column
+    ws1.append(["Alice", 25])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["ID", "Name", "Salary"])
+    ws2.append([1, "Alice", 50000])
+    
+    file_path = temp_excel_path / "compare_test.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = CompareSheetsRequest(
+        file_path=str(file_path),
+        sheet1="Sheet1",
+        sheet2="Sheet2",
+        key_column="ID",  # Doesn't exist in Sheet1
+        compare_columns=["Name"]
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        ops.compare_sheets(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "ID" in error_msg, "Error should mention missing column"
+    assert "Sheet1" in error_msg, "Error should mention which sheet"
+    assert "Available columns" in error_msg, "Error should list available columns"
+    assert "Name" in error_msg and "Age" in error_msg, "Error should show actual columns"
+
+
+def test_compare_sheets_missing_key_column_sheet2(temp_excel_path, file_loader):
+    """Test compare_sheets raises error when key_column missing in sheet2.
+    
+    Covers lines 387-391: Validation for key_column in sheet2
+    
+    Verifies:
+    - Raises ValueError with helpful message
+    - Lists available columns for sheet2
+    """
+    print(f"\n📂 Testing compare_sheets with missing key_column in sheet2")
+    
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["ID", "Name", "Age"])
+    ws1.append([1, "Alice", 25])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["Name", "Salary"])  # No "ID" column
+    ws2.append(["Alice", 50000])
+    
+    file_path = temp_excel_path / "compare_test2.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = CompareSheetsRequest(
+        file_path=str(file_path),
+        sheet1="Sheet1",
+        sheet2="Sheet2",
+        key_column="ID",  # Doesn't exist in Sheet2
+        compare_columns=["Name"]
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        ops.compare_sheets(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "ID" in error_msg, "Error should mention missing column"
+    assert "Sheet2" in error_msg, "Error should mention which sheet"
+    assert "Available columns" in error_msg, "Error should list available columns"
+
+
+def test_compare_sheets_missing_compare_column_sheet1(temp_excel_path, file_loader):
+    """Test compare_sheets raises error when compare_column missing in sheet1.
+    
+    Covers lines 394-398: Validation for compare_columns in sheet1
+    
+    Verifies:
+    - Raises ValueError for missing compare column
+    """
+    print(f"\n📂 Testing compare_sheets with missing compare_column in sheet1")
+    
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["ID", "Name"])  # No "Salary" column
+    ws1.append([1, "Alice"])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["ID", "Name", "Salary"])
+    ws2.append([1, "Alice", 50000])
+    
+    file_path = temp_excel_path / "compare_test3.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = CompareSheetsRequest(
+        file_path=str(file_path),
+        sheet1="Sheet1",
+        sheet2="Sheet2",
+        key_column="ID",
+        compare_columns=["Salary"]  # Doesn't exist in Sheet1
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        ops.compare_sheets(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "Salary" in error_msg, "Error should mention missing column"
+    assert "Sheet1" in error_msg, "Error should mention which sheet"
+
+
+def test_compare_sheets_missing_compare_column_sheet2(temp_excel_path, file_loader):
+    """Test compare_sheets raises error when compare_column missing in sheet2.
+    
+    Covers lines 399-402: Validation for compare_columns in sheet2
+    
+    Verifies:
+    - Raises ValueError for missing compare column in sheet2
+    """
+    print(f"\n📂 Testing compare_sheets with missing compare_column in sheet2")
+    
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["ID", "Name", "Salary"])
+    ws1.append([1, "Alice", 50000])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["ID", "Name"])  # No "Salary" column
+    ws2.append([1, "Alice"])
+    
+    file_path = temp_excel_path / "compare_test4.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = CompareSheetsRequest(
+        file_path=str(file_path),
+        sheet1="Sheet1",
+        sheet2="Sheet2",
+        key_column="ID",
+        compare_columns=["Salary"]  # Doesn't exist in Sheet2
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        ops.compare_sheets(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "Salary" in error_msg, "Error should mention missing column"
+    assert "Sheet2" in error_msg, "Error should mention which sheet"
+
+
+# ============================================================================
+# Truncation Tests (lines 419-421, 426-437, 474-475)
+# ============================================================================
+
+def test_compare_sheets_only_in_sheet1(temp_excel_path, file_loader):
+    """Test compare_sheets with rows only_in_sheet1.
+    
+    Covers lines 426-431: Building diff_entry for "only_in_sheet1" status
+    
+    Verifies:
+    - Correctly identifies rows only in sheet1
+    - Sets status to "only_in_sheet1"
+    - Sets sheet2 values to None
+    """
+    print(f"\n📂 Testing compare_sheets with only_in_sheet1 rows")
+    
+    # Create sheets with rows only in sheet1
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["ID", "Name", "Amount"])
+    ws1.append([1, "Alice", 100])
+    ws1.append([2, "Bob", 200])
+    ws1.append([3, "Charlie", 300])  # Only in sheet1
+    ws1.append([4, "David", 400])    # Only in sheet1
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["ID", "Name", "Amount"])
+    ws2.append([1, "Alice", 100])
+    ws2.append([2, "Bob", 200])
+    
+    file_path = temp_excel_path / "only_in_sheet1.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = CompareSheetsRequest(
+        file_path=str(file_path),
+        sheet1="Sheet1",
+        sheet2="Sheet2",
+        key_column="ID",
+        compare_columns=["Name", "Amount"]
+    )
+    
+    # Act
+    response = ops.compare_sheets(request)
+    
+    # Assert
+    print(f"✅ Differences: {response.difference_count}")
+    
+    assert response.difference_count == 2, "Should find 2 differences"
+    
+    # Check only_in_sheet1 entries
+    only_in_sheet1 = [d for d in response.differences if d["status"] == "only_in_sheet1"]
+    assert len(only_in_sheet1) == 2, "Should have 2 rows only in sheet1"
+    
+    # Check structure
+    for diff in only_in_sheet1:
+        assert diff["status"] == "only_in_sheet1"
+        assert diff["Name_sheet1"] is not None
+        assert diff["Name_sheet2"] is None
+        assert diff["Amount_sheet1"] is not None
+        assert diff["Amount_sheet2"] is None
+        
+        print(f"   Row {diff['ID']}: {diff['Name_sheet1']} only in sheet1")
+
+
+def test_compare_sheets_only_in_sheet2(temp_excel_path, file_loader):
+    """Test compare_sheets with rows only_in_sheet2.
+    
+    Covers lines 432-437: Building diff_entry for "only_in_sheet2" status
+    
+    Verifies:
+    - Correctly identifies rows only in sheet2
+    - Sets status to "only_in_sheet2"
+    - Sets sheet1 values to None
+    """
+    print(f"\n📂 Testing compare_sheets with only_in_sheet2 rows")
+    
+    # Create sheets with rows only in sheet2
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["ID", "Name", "Amount"])
+    ws1.append([1, "Alice", 100])
+    ws1.append([2, "Bob", 200])
+    
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["ID", "Name", "Amount"])
+    ws2.append([1, "Alice", 100])
+    ws2.append([2, "Bob", 200])
+    ws2.append([3, "Charlie", 300])  # Only in sheet2
+    ws2.append([4, "David", 400])    # Only in sheet2
+    ws2.append([5, "Eve", 500])      # Only in sheet2
+    
+    file_path = temp_excel_path / "only_in_sheet2.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = CompareSheetsRequest(
+        file_path=str(file_path),
+        sheet1="Sheet1",
+        sheet2="Sheet2",
+        key_column="ID",
+        compare_columns=["Name", "Amount"]
+    )
+    
+    # Act
+    response = ops.compare_sheets(request)
+    
+    # Assert
+    print(f"✅ Differences: {response.difference_count}")
+    
+    assert response.difference_count == 3, "Should find 3 differences"
+    
+    # Check only_in_sheet2 entries
+    only_in_sheet2 = [d for d in response.differences if d["status"] == "only_in_sheet2"]
+    assert len(only_in_sheet2) == 3, "Should have 3 rows only in sheet2"
+    
+    # Check structure
+    for diff in only_in_sheet2:
+        assert diff["status"] == "only_in_sheet2"
+        assert diff["Name_sheet1"] is None
+        assert diff["Name_sheet2"] is not None
+        assert diff["Amount_sheet1"] is None
+        assert diff["Amount_sheet2"] is not None
+        
+        print(f"   Row {diff['ID']}: {diff['Name_sheet2']} only in sheet2")
+
+
+# ============================================================================
+# Edge Case in get_data_profile (line 551-552)
+# ============================================================================
+
+def test_get_data_profile_boolean_column(temp_excel_path, file_loader):
+    """Test get_data_profile with boolean column.
+    
+    Covers lines 551-552: Boolean data type detection
+    
+    Verifies:
+    - Correctly identifies boolean columns
+    - Returns data_type="boolean"
+    - No statistics for boolean (only for numeric)
+    """
+    print(f"\n📂 Testing get_data_profile with boolean column")
+    
+    # Create file with boolean column
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    ws.append(["Name", "Active", "Premium"])
+    ws.append(["Alice", True, False])
+    ws.append(["Bob", False, True])
+    ws.append(["Charlie", True, True])
+    ws.append(["David", False, False])
+    
+    file_path = temp_excel_path / "boolean_test.xlsx"
+    wb.save(file_path)
+    
+    ops = InspectionOperations(file_loader)
+    request = GetDataProfileRequest(
+        file_path=str(file_path),
+        sheet_name="Data",
+        columns=["Active", "Premium"],
+        top_n=3
+    )
+    
+    # Act
+    response = ops.get_data_profile(request)
+    
+    # Assert
+    print(f"✅ Profiled columns: {response.columns_profiled}")
+    
+    assert response.columns_profiled == 2, "Should profile 2 columns"
+    
+    # Check boolean columns
+    for col_name in ["Active", "Premium"]:
+        profile = response.profiles[col_name]
+        print(f"\n   Column: {col_name}")
+        print(f"     Type: {profile.data_type}")
+        print(f"     Unique: {profile.unique_count}")
+        
+        assert profile.data_type == "boolean", f"Column {col_name} should be boolean type"
+        assert profile.stats is None, "Boolean columns should not have numeric stats"
+        assert profile.unique_count <= 2, "Boolean column should have max 2 unique values"
+        assert len(profile.top_values) > 0, "Should have top values"

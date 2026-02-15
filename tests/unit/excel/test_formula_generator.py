@@ -693,3 +693,402 @@ def test_cyrillic_in_formulas():
     assert "Москва" in formula, "Cyrillic should be preserved in formula"
     print(f"   Formula: {formula}")
     print("✅ Cyrillic handled correctly in formulas")
+
+
+# ============================================================================
+# ADDITIONAL COVERAGE TESTS
+# ============================================================================
+
+def test_operator_in_with_sum():
+    """Test 'in' operator with sum operation."""
+    print("\n📂 Testing 'in' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$C:$C"}
+    target_range = "Sheet1!$D:$D"
+    
+    filters = [FilterCondition(column="Status", operator="in", values=["Active", "Pending"])]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should use SUMPRODUCT with multiplication
+    assert "SUMPRODUCT" in formula, "'in' with sum should use SUMPRODUCT"
+    assert target_range in formula, "Target range should be in formula"
+    print(f"   Formula: {formula}")
+    print("✅ 'in' operator with sum works")
+
+
+def test_operator_in_with_mean():
+    """Test 'in' operator with mean operation."""
+    print("\n📂 Testing 'in' operator with mean")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$C:$C"}
+    target_range = "Sheet1!$D:$D"
+    
+    filters = [FilterCondition(column="Status", operator="in", values=["Active", "Pending"])]
+    formula = gen.generate_from_filter("mean", filters, column_ranges, target_range=target_range)
+    
+    # Should use SUMPRODUCT division for average
+    assert "SUMPRODUCT" in formula, "'in' with mean should use SUMPRODUCT"
+    assert "/" in formula, "Mean should use division"
+    print(f"   Formula: {formula}")
+    print("✅ 'in' operator with mean works")
+
+
+def test_operator_not_in_with_sum():
+    """Test 'not_in' operator with sum operation."""
+    print("\n📂 Testing 'not_in' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$C:$C"}
+    target_range = "Sheet1!$D:$D"
+    
+    filters = [FilterCondition(column="Status", operator="not_in", values=["Cancelled"])]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should return NA() - not supported
+    assert "NA()" in formula, "'not_in' with sum should return NA()"
+    print(f"   Formula: {formula}")
+    print("✅ 'not_in' operator with sum handled correctly")
+
+
+def test_operator_contains_with_sum():
+    """Test 'contains' operator with sum operation."""
+    print("\n📂 Testing 'contains' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Name": "Sheet1!$A:$A"}
+    target_range = "Sheet1!$B:$B"
+    
+    filters = [FilterCondition(column="Name", operator="contains", value="John")]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should use SUMIF with wildcards
+    assert "SUMIF" in formula, "'contains' with sum should use SUMIF"
+    assert "*John*" in formula, "Should use wildcards"
+    print(f"   Formula: {formula}")
+    print("✅ 'contains' operator with sum works")
+
+
+def test_operator_contains_with_mean():
+    """Test 'contains' operator with mean operation."""
+    print("\n📂 Testing 'contains' operator with mean")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Name": "Sheet1!$A:$A"}
+    target_range = "Sheet1!$B:$B"
+    
+    filters = [FilterCondition(column="Name", operator="contains", value="John")]
+    formula = gen.generate_from_filter("mean", filters, column_ranges, target_range=target_range)
+    
+    # Should use AVERAGEIF with wildcards
+    assert "AVERAGEIF" in formula, "'contains' with mean should use AVERAGEIF"
+    assert "*John*" in formula, "Should use wildcards"
+    print(f"   Formula: {formula}")
+    print("✅ 'contains' operator with mean works")
+
+
+def test_operator_startswith_with_sum():
+    """Test 'startswith' operator with sum operation."""
+    print("\n📂 Testing 'startswith' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Name": "Sheet1!$A:$A"}
+    target_range = "Sheet1!$B:$B"
+    
+    filters = [FilterCondition(column="Name", operator="startswith", value="John")]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should use SUMIF with wildcard at end
+    assert "SUMIF" in formula, "'startswith' with sum should use SUMIF"
+    assert "John*" in formula, "Should use wildcard at end"
+    print(f"   Formula: {formula}")
+    print("✅ 'startswith' operator with sum works")
+
+
+def test_operator_startswith_with_mean():
+    """Test 'startswith' operator with mean operation."""
+    print("\n📂 Testing 'startswith' operator with mean")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Name": "Sheet1!$A:$A"}
+    target_range = "Sheet1!$B:$B"
+    
+    filters = [FilterCondition(column="Name", operator="startswith", value="John")]
+    formula = gen.generate_from_filter("mean", filters, column_ranges, target_range=target_range)
+    
+    # Should use AVERAGEIF with wildcard at end
+    assert "AVERAGEIF" in formula, "'startswith' with mean should use AVERAGEIF"
+    assert "John*" in formula, "Should use wildcard at end"
+    print(f"   Formula: {formula}")
+    print("✅ 'startswith' operator with mean works")
+
+
+def test_operator_endswith_with_sum():
+    """Test 'endswith' operator with sum operation."""
+    print("\n📂 Testing 'endswith' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Name": "Sheet1!$A:$A"}
+    target_range = "Sheet1!$B:$B"
+    
+    filters = [FilterCondition(column="Name", operator="endswith", value="son")]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should use SUMIF with wildcard at start
+    assert "SUMIF" in formula, "'endswith' with sum should use SUMIF"
+    assert "*son" in formula, "Should use wildcard at start"
+    print(f"   Formula: {formula}")
+    print("✅ 'endswith' operator with sum works")
+
+
+def test_operator_endswith_with_mean():
+    """Test 'endswith' operator with mean operation."""
+    print("\n📂 Testing 'endswith' operator with mean")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Name": "Sheet1!$A:$A"}
+    target_range = "Sheet1!$B:$B"
+    
+    filters = [FilterCondition(column="Name", operator="endswith", value="son")]
+    formula = gen.generate_from_filter("mean", filters, column_ranges, target_range=target_range)
+    
+    # Should use AVERAGEIF with wildcard at start
+    assert "AVERAGEIF" in formula, "'endswith' with mean should use AVERAGEIF"
+    assert "*son" in formula, "Should use wildcard at start"
+    print(f"   Formula: {formula}")
+    print("✅ 'endswith' operator with mean works")
+
+
+def test_operator_is_null_with_sum():
+    """Test 'is_null' operator with sum operation."""
+    print("\n📂 Testing 'is_null' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Email": "Sheet1!$D:$D"}
+    target_range = "Sheet1!$E:$E"
+    
+    filters = [FilterCondition(column="Email", operator="is_null", value=None)]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should return NA() - not supported
+    assert "NA()" in formula or formula is None, "'is_null' with sum should return NA() or None"
+    print(f"   Formula: {formula}")
+    print("✅ 'is_null' operator with sum handled correctly")
+
+
+def test_operator_is_not_null_with_sum():
+    """Test 'is_not_null' operator with sum operation."""
+    print("\n📂 Testing 'is_not_null' operator with sum")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Email": "Sheet1!$D:$D"}
+    target_range = "Sheet1!$E:$E"
+    
+    filters = [FilterCondition(column="Email", operator="is_not_null", value=None)]
+    formula = gen.generate_from_filter("sum", filters, column_ranges, target_range=target_range)
+    
+    # Should use SUM
+    assert formula == "=SUM(Sheet1!$E:$E)", "'is_not_null' with sum should use SUM"
+    print(f"   Formula: {formula}")
+    print("✅ 'is_not_null' operator with sum works")
+
+
+def test_operator_is_not_null_with_mean():
+    """Test 'is_not_null' operator with mean operation."""
+    print("\n📂 Testing 'is_not_null' operator with mean")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Email": "Sheet1!$D:$D"}
+    target_range = "Sheet1!$E:$E"
+    
+    filters = [FilterCondition(column="Email", operator="is_not_null", value=None)]
+    formula = gen.generate_from_filter("mean", filters, column_ranges, target_range=target_range)
+    
+    # Should use AVERAGE
+    assert formula == "=AVERAGE(Sheet1!$E:$E)", "'is_not_null' with mean should use AVERAGE"
+    print(f"   Formula: {formula}")
+    print("✅ 'is_not_null' operator with mean works")
+
+
+def test_datetime_in_operator_conversion():
+    """Test datetime conversion in 'in' operator."""
+    print("\n📂 Testing datetime conversion in 'in' operator")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Date": "Sheet1!$E:$E"}
+    column_types = {"Date": "datetime"}
+    
+    # String datetime values in 'in' operator should be converted
+    filters = [FilterCondition(column="Date", operator="in", values=["2024-01-01", "2024-02-01"])]
+    formula = gen.generate_from_filter("count", filters, column_ranges, column_types=column_types)
+    
+    # Should contain DATE() functions
+    assert "DATE(" in formula, "DateTime 'in' operator should use DATE() functions"
+    print(f"   Formula: {formula}")
+    print("✅ DateTime 'in' operator conversion works")
+
+
+def test_format_criteria_with_string_comparison():
+    """Test _format_criteria with string comparison operators."""
+    print("\n📂 Testing _format_criteria with string comparison")
+    
+    gen = FormulaGenerator("Sheet1")
+    
+    # Test != with string
+    criteria_ne = gen._format_criteria("!=", "test")
+    assert criteria_ne == '"<>test"', "!= with string should format correctly"
+    print(f"   != string: {criteria_ne}")
+    
+    # Test > with string
+    criteria_gt = gen._format_criteria(">", "abc")
+    assert criteria_gt == '">abc"', "> with string should format correctly"
+    print(f"   > string: {criteria_gt}")
+    
+    # Test >= with string
+    criteria_gte = gen._format_criteria(">=", "abc")
+    assert criteria_gte == '">=abc"', ">= with string should format correctly"
+    print(f"   >= string: {criteria_gte}")
+    
+    print("✅ String comparison criteria formatted correctly")
+
+
+def test_format_criteria_text_operators_with_numbers():
+    """Test _format_criteria with text operators on numeric values."""
+    print("\n📂 Testing _format_criteria text operators with numbers")
+    
+    gen = FormulaGenerator("Sheet1")
+    
+    # Test contains with number
+    criteria_contains = gen._format_criteria("contains", 123)
+    assert criteria_contains == '"*123*"', "contains with number should convert to string"
+    print(f"   contains number: {criteria_contains}")
+    
+    # Test startswith with number
+    criteria_starts = gen._format_criteria("startswith", 456)
+    assert criteria_starts == '"456*"', "startswith with number should convert to string"
+    print(f"   startswith number: {criteria_starts}")
+    
+    # Test endswith with number
+    criteria_ends = gen._format_criteria("endswith", 789)
+    assert criteria_ends == '"*789"', "endswith with number should convert to string"
+    print(f"   endswith number: {criteria_ends}")
+    
+    print("✅ Text operators with numbers formatted correctly")
+
+
+def test_no_filters_all_operations():
+    """Test all operations without filters."""
+    print("\n📂 Testing all operations without filters")
+    
+    gen = FormulaGenerator("Sheet1")
+    target_range = "Sheet1!$C:$C"
+    
+    # Test median
+    formula_median = gen.generate_from_filter("median", [], {}, target_range=target_range)
+    assert formula_median == "=MEDIAN(Sheet1!$C:$C)", "Median without filters should use MEDIAN"
+    
+    # Test min
+    formula_min = gen.generate_from_filter("min", [], {}, target_range=target_range)
+    assert formula_min == "=MIN(Sheet1!$C:$C)", "Min without filters should use MIN"
+    
+    # Test max
+    formula_max = gen.generate_from_filter("max", [], {}, target_range=target_range)
+    assert formula_max == "=MAX(Sheet1!$C:$C)", "Max without filters should use MAX"
+    
+    # Test std
+    formula_std = gen.generate_from_filter("std", [], {}, target_range=target_range)
+    assert formula_std == "=STDEV(Sheet1!$C:$C)", "Std without filters should use STDEV"
+    
+    # Test var
+    formula_var = gen.generate_from_filter("var", [], {}, target_range=target_range)
+    assert formula_var == "=VAR(Sheet1!$C:$C)", "Var without filters should use VAR"
+    
+    print("✅ All operations without filters work correctly")
+
+
+def test_unsupported_operation_error():
+    """Test error for unsupported operation without filters."""
+    print("\n📂 Testing unsupported operation error")
+    
+    gen = FormulaGenerator("Sheet1")
+    
+    with pytest.raises(ValueError) as exc_info:
+        gen.generate_from_filter("unsupported", [], {})
+    
+    assert "requires" in str(exc_info.value).lower(), "Should raise error for unsupported operation"
+    print(f"   ✅ Error caught: {exc_info.value}")
+    print("✅ Unsupported operation error handled correctly")
+
+
+def test_multiple_filters_unsupported_operation():
+    """Test unsupported operation with multiple filters."""
+    print("\n📂 Testing unsupported operation with multiple filters")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {
+        "City": "Sheet1!$A:$A",
+        "Age": "Sheet1!$B:$B"
+    }
+    
+    filters = [
+        FilterCondition(column="City", operator="==", value="Moscow"),
+        FilterCondition(column="Age", operator=">", value=25)
+    ]
+    
+    # Test mean with multiple filters (not fully supported)
+    formula = gen.generate_from_filter("mean", filters, column_ranges)
+    
+    # Should return NA() message
+    assert "NA()" in formula, "Unsupported operation with multiple filters should return NA()"
+    print(f"   Formula: {formula}")
+    print("✅ Unsupported operation with multiple filters handled correctly")
+
+
+def test_datetime_not_equal_operator():
+    """Test datetime with != operator."""
+    print("\n📂 Testing datetime != operator")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Date": "Sheet1!$E:$E"}
+    column_types = {"Date": "datetime"}
+    
+    filters = [FilterCondition(column="Date", operator="!=", value="2024-01-01")]
+    formula = gen.generate_from_filter("count", filters, column_ranges, column_types=column_types)
+    
+    # Should use "<>"&DATE(...)
+    assert "<>" in formula and "DATE(" in formula, "!= with datetime should use <>&DATE()"
+    print(f"   Formula: {formula}")
+    print("✅ DateTime != operator works")
+
+
+def test_operator_in_empty_values():
+    """Test 'in' operator with empty values list."""
+    print("\n📂 Testing 'in' operator with empty values")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$C:$C"}
+    
+    filters = [FilterCondition(column="Status", operator="in", values=[])]
+    formula = gen.generate_from_filter("count", filters, column_ranges)
+    
+    # Should return NA() - requires values
+    assert "NA()" in formula, "'in' with empty values should return NA()"
+    print(f"   Formula: {formula}")
+    print("✅ 'in' operator with empty values handled correctly")
+
+
+def test_operator_not_in_empty_values():
+    """Test 'not_in' operator with empty values list."""
+    print("\n📂 Testing 'not_in' operator with empty values")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$C:$C"}
+    
+    filters = [FilterCondition(column="Status", operator="not_in", values=[])]
+    formula = gen.generate_from_filter("count", filters, column_ranges)
+    
+    # Should return NA() - requires values
+    assert "NA()" in formula, "'not_in' with empty values should return NA()"
+    print(f"   Formula: {formula}")
+    print("✅ 'not_in' operator with empty values handled correctly")

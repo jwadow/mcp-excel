@@ -453,15 +453,16 @@ git commit -m "test: add my_new_fixture for [feature]"
 
 **Priority 1: Core Components (Unit Tests)**
 - `tests/unit/core/test_file_loader.py` - ✅ DONE (27 tests)
-- `tests/unit/core/test_header_detector.py` - ✅ DONE (24 tests)
+- `tests/unit/core/test_header_detector.py` - ✅ DONE (29 tests)
 - `tests/unit/core/test_datetime_detector.py` - ✅ DONE (16 tests)
 - `tests/unit/core/test_datetime_converter.py` - ✅ DONE (14 tests)
 - `tests/unit/operations/test_filter_engine.py` - ✅ DONE (46 tests)
-- `tests/unit/excel/test_formula_generator.py` - ✅ DONE (40 tests)
+- `tests/unit/operations/test_base_operations.py` - ✅ DONE (18 tests)
+- `tests/unit/excel/test_formula_generator.py` - ✅ DONE (53 tests)
 - `tests/unit/excel/test_tsv_formatter.py` - ✅ DONE (26 tests)
 
 **Priority 2: Operations (Integration Tests)**
-- `tests/integration/test_file_inspection.py` - ✅ DONE (37 tests) - inspect_file, get_sheet_info, get_column_names, get_data_profile
+- `tests/integration/test_file_inspection.py` - ✅ DONE (47 tests) - inspect_file, get_sheet_info, get_column_names, get_data_profile
 - `tests/integration/test_data_retrieval.py` - ✅ DONE (48 tests) - get_unique_values, get_value_counts, filter_and_get_rows
 - `tests/integration/test_filtering_and_counting.py` - ✅ DONE (26 tests) - filter_and_count with ALL 12 operators, combined filters (AND/OR), datetime filtering, edge cases
 - `tests/integration/test_aggregation.py` - ✅ DONE (28 tests) - aggregate (8 operations: sum, mean, median, min, max, std, var, count), group_by with single/multiple columns, filters, edge cases

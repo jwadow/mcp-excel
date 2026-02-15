@@ -489,3 +489,147 @@ def test_parametrized_all_messy_fixtures(messy_fixture_meta, file_loader, header
     
     assert result.header_row == messy_fixture_meta.header_row, f"Should detect correct header in {messy_fixture_meta.name}"
     assert result.confidence > 0.6, "Should have reasonable confidence even for messy files"
+
+
+# ============================================================================
+# Edge Case Tests (lines 104, 158-180)
+# ============================================================================
+
+def test_has_numeric_only_values_short_numbers(header_detector):
+    """Test _has_numeric_only_values with short numeric strings (≤4 chars).
+    
+    Covers line 104: len(val) > 4 condition
+    
+    Verifies:
+    - Short numeric strings (≤4 chars) don't trigger numeric-only flag
+    - Long numeric strings (>4 chars) do trigger the flag
+    - This prevents treating years/IDs as "data-only" rows
+    """
+    print(f"\n📂 Testing _has_numeric_only_values with short numbers")
+    
+    # Short numeric strings (≤4 chars) - should return False
+    row_short = pd.Series(["123", "456", "789"])
+    result_short = header_detector._has_numeric_only_values(row_short)
+    
+    print(f"✅ Short numbers (≤4 chars): {result_short}")
+    assert result_short == False, "Short numeric strings should NOT trigger numeric-only flag"
+    
+    # Long numeric strings (>4 chars) - should return True
+    row_long = pd.Series(["12345", "67890", "11111"])
+    result_long = header_detector._has_numeric_only_values(row_long)
+    
+    print(f"   Long numbers (>4 chars): {result_long}")
+    assert result_long == True, "Long numeric strings should trigger numeric-only flag"
+    
+    # Mixed - should return True if at least one long number
+    row_mixed = pd.Series(["123", "456789", "Name"])
+    result_mixed = header_detector._has_numeric_only_values(row_mixed)
+    
+    print(f"   Mixed (short + long): {result_mixed}")
+    assert result_mixed == True, "Should trigger if at least one long numeric string"
+
+
+def test_analyze_following_rows_consistency_high(header_detector):
+    """Test _analyze_following_rows_consistency with consistent data.
+    
+    Covers lines 158-180: Consistency analysis logic
+    
+    Verifies:
+    - High consistency (similar fill rates) returns high score
+    - Variance calculation works correctly
+    """
+    print(f"\n📂 Testing consistency analysis with consistent data")
+    
+    # Create DataFrame with consistent data after header
+    df = pd.DataFrame({
+        0: ["Name", "Alice", "Bob", "Charlie", "David", "Eve"],
+        1: ["Age", "25", "30", "35", "40", "45"],
+        2: ["City", "Moscow", "London", "Paris", "Berlin", "Rome"],
+    })
+    
+    # Analyze consistency after row 0 (header)
+    consistency = header_detector._analyze_following_rows_consistency(df, 0)
+    
+    print(f"✅ Consistency score: {consistency:.3f}")
+    print(f"   Expected: high (>0.8) because all data rows have same fill rate")
+    
+    assert consistency > 0.8, "Consistent data should have high consistency score"
+
+
+def test_analyze_following_rows_consistency_low(header_detector):
+    """Test _analyze_following_rows_consistency with inconsistent data.
+    
+    Covers lines 158-180: Variance calculation
+    
+    Verifies:
+    - Low consistency (varying fill rates) returns low score
+    - Handles sparse data correctly
+    """
+    print(f"\n📂 Testing consistency analysis with inconsistent data")
+    
+    # Create DataFrame with inconsistent data (varying fill rates)
+    df = pd.DataFrame({
+        0: ["Name", "Alice", "Bob", None, "David", None],
+        1: ["Age", "25", None, "35", None, "45"],
+        2: ["City", "Moscow", None, None, None, None],
+    })
+    
+    # Analyze consistency after row 0
+    consistency = header_detector._analyze_following_rows_consistency(df, 0)
+    
+    print(f"✅ Consistency score: {consistency:.3f}")
+    print(f"   Expected: low (<0.5) because fill rates vary significantly")
+    
+    assert consistency < 0.5, "Inconsistent data should have low consistency score"
+
+
+def test_analyze_following_rows_consistency_near_end(header_detector):
+    """Test _analyze_following_rows_consistency with candidate near end.
+    
+    Covers lines 158-159: Early return for candidates near end
+    
+    Verifies:
+    - Returns 0.0 when candidate is within 3 rows of end
+    - Prevents false positives from insufficient data
+    """
+    print(f"\n📂 Testing consistency analysis near end of file")
+    
+    # Create small DataFrame
+    df = pd.DataFrame({
+        0: ["Name", "Alice", "Bob", "Charlie"],
+        1: ["Age", "25", "30", "35"],
+    })
+    
+    # Analyze consistency for row 2 (only 1 row after it)
+    consistency = header_detector._analyze_following_rows_consistency(df, 2)
+    
+    print(f"✅ Consistency score for row near end: {consistency:.3f}")
+    print(f"   Expected: 0.0 (insufficient rows after candidate)")
+    
+    assert consistency == 0.0, "Should return 0.0 when candidate is near end"
+
+
+def test_analyze_following_rows_consistency_insufficient_rows(header_detector):
+    """Test _analyze_following_rows_consistency with insufficient following rows.
+    
+    Covers lines 164-165: Early return for < 2 rows
+    
+    Verifies:
+    - Returns 0.0 when < 2 rows available after candidate
+    - Handles edge case gracefully
+    """
+    print(f"\n📂 Testing consistency analysis with insufficient rows")
+    
+    # Create DataFrame with only 1 row after candidate
+    df = pd.DataFrame({
+        0: ["Header", "Data1"],
+        1: ["Col2", "Val2"],
+    })
+    
+    # Analyze consistency for row 0 (only 1 row after)
+    consistency = header_detector._analyze_following_rows_consistency(df, 0)
+    
+    print(f"✅ Consistency score with 1 row after: {consistency:.3f}")
+    print(f"   Expected: 0.0 (need at least 2 rows for variance calculation)")
+    
+    assert consistency == 0.0, "Should return 0.0 when < 2 rows available"
