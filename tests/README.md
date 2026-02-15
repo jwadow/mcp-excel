@@ -456,7 +456,7 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/integration/test_statistics.py` - ✅ DONE (30 tests) - get_column_stats, correlate (pearson/spearman), detect_outliers (IQR/Z-score), text-to-numeric conversion, filters, edge cases
 - `tests/integration/test_validation.py` - ✅ DONE (24 tests) - find_duplicates (single/multiple columns, row indices, TSV output), find_nulls (null statistics, percentage calculation, indices limit)
 - `tests/integration/test_multisheet.py` - ✅ DONE (21 tests) - find_column, search_across_sheets, compare_sheets
-- `tests/integration/test_timeseries.py` - calculate_period_change, running_total, moving_average
+- `tests/integration/test_timeseries.py` - ✅ DONE (24 tests) - calculate_period_change (month/quarter/year periods, filters), calculate_running_total (basic, with grouping, filters), calculate_moving_average (various window sizes, datetime ordering, filters), edge cases with messy headers
 - `tests/integration/test_advanced.py` - rank_rows, calculate_expression
 
 **Priority 3: Edge Cases & Performance**
