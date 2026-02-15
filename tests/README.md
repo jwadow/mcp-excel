@@ -453,7 +453,7 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/integration/test_data_retrieval.py` - ✅ DONE (48 tests) - get_unique_values, get_value_counts, filter_and_get_rows
 - `tests/integration/test_filtering_and_counting.py` - ✅ DONE (26 tests) - filter_and_count with ALL 12 operators, combined filters (AND/OR), datetime filtering, edge cases
 - `tests/integration/test_aggregation.py` - ✅ DONE (28 tests) - aggregate (8 operations: sum, mean, median, min, max, std, var, count), group_by with single/multiple columns, filters, edge cases
-- `tests/integration/test_statistics.py` - get_column_stats, correlate, detect_outliers
+- `tests/integration/test_statistics.py` - ✅ DONE (30 tests) - get_column_stats, correlate (pearson/spearman), detect_outliers (IQR/Z-score), text-to-numeric conversion, filters, edge cases
 - `tests/integration/test_validation.py` - find_duplicates, find_nulls
 - `tests/integration/test_multisheet.py` - find_column, search_across_sheets, compare_sheets
 - `tests/integration/test_timeseries.py` - calculate_period_change, running_total, moving_average
