@@ -441,10 +441,10 @@ git commit -m "test: add my_new_fixture for [feature]"
 
 **Priority 1: Core Components (Unit Tests)**
 - `tests/unit/core/test_file_loader.py` - ✅ DONE (27 tests)
-- `tests/unit/core/test_header_detector.py` - HeaderDetector (auto-detection algorithm)
-- `tests/unit/core/test_datetime_detector.py` - DateTimeDetector (datetime column detection)
-- `tests/unit/core/test_datetime_converter.py` - DateTimeConverter (Excel number → datetime)
-- `tests/unit/operations/test_filter_engine.py` - FilterEngine (12 operators, complex logic)
+- `tests/unit/core/test_header_detector.py` - ✅ DONE (24 tests)
+- `tests/unit/core/test_datetime_detector.py` - ✅ DONE (16 tests)
+- `tests/unit/core/test_datetime_converter.py` - ✅ DONE (14 tests)
+- `tests/unit/operations/test_filter_engine.py` - ✅ DONE (46 tests)
 - `tests/unit/excel/test_formula_generator.py` - FormulaGenerator (all formula types)
 - `tests/unit/excel/test_tsv_formatter.py` - TSVFormatter (TSV generation)
 
