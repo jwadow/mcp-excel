@@ -45,9 +45,10 @@ class ExcelFixtureBuilder:
         self.messy_dir = fixtures_root / "messy"
         self.edge_cases_dir = fixtures_root / "edge_cases"
         self.legacy_dir = fixtures_root / "legacy"
+        self.performance_dir = fixtures_root / "performance"
         
         # Ensure all directories exist
-        for dir_path in [self.basic_dir, self.messy_dir, self.edge_cases_dir, self.legacy_dir]:
+        for dir_path in [self.basic_dir, self.messy_dir, self.edge_cases_dir, self.legacy_dir, self.performance_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
     def create_simple_xlsx(self) -> Path:
@@ -665,6 +666,153 @@ class ExcelFixtureBuilder:
         wb.save(str(output_path))
         return output_path
 
+    def create_large_10k_xlsx(self) -> Path:
+        """Creates large table with 10,000 rows for performance testing.
+        
+        Tests basic performance: filtering, aggregation, statistics.
+        Structure: Order ID, Customer, Product, Quantity, Price, Total, Date, Status, Region
+        """
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Orders"
+
+        # Headers
+        headers = ["Order ID", "Customer", "Product", "Quantity", "Price", "Total", "Date", "Status", "Region"]
+        ws.append(headers)
+
+        # Generate realistic data
+        customers = [f"Customer_{i:03d}" for i in range(1, 101)]  # 100 unique customers
+        products = [f"Product_{i:02d}" for i in range(1, 51)]  # 50 unique products
+        statuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
+        regions = ["North", "South", "East", "West", "Central", "Northeast", "Southeast", "Northwest", "Southwest", "International"]
+        
+        base_date = datetime(2024, 1, 1)
+        
+        print(f"    Generating 10,000 rows...")
+        for i in range(1, 10001):
+            order_id = f"ORD-{100000 + i}"
+            customer = customers[i % len(customers)]
+            product = products[i % len(products)]
+            quantity = (i % 50) + 1  # 1-50
+            price = 10 + (i % 990) * 10  # 10-10000
+            total = quantity * price
+            order_date = base_date + timedelta(days=i % 365, hours=i % 24)
+            status = statuses[i % len(statuses)]
+            region = regions[i % len(regions)]
+            
+            ws.append([order_id, customer, product, quantity, price, total, order_date, status, region])
+            
+            # Progress indicator
+            if i % 2000 == 0:
+                print(f"      {i}/10000 rows...")
+
+        # Format date column
+        for row in range(2, ws.max_row + 1):
+            ws.cell(row, 7).number_format = "DD/MM/YYYY HH:MM"
+
+        output_path = self.performance_dir / "large_10k.xlsx"
+        print(f"    Saving file...")
+        wb.save(output_path)
+        return output_path
+
+    def create_large_50k_xlsx(self) -> Path:
+        """Creates large table with 50,000 rows for stress testing.
+        
+        Tests aggregation performance, grouping, complex filters.
+        Same structure as 10k but with more data.
+        """
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Orders"
+
+        # Headers
+        headers = ["Order ID", "Customer", "Product", "Quantity", "Price", "Total", "Date", "Status", "Region"]
+        ws.append(headers)
+
+        # Generate realistic data
+        customers = [f"Customer_{i:03d}" for i in range(1, 201)]  # 200 unique customers
+        products = [f"Product_{i:02d}" for i in range(1, 101)]  # 100 unique products
+        statuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
+        regions = ["North", "South", "East", "West", "Central", "Northeast", "Southeast", "Northwest", "Southwest", "International"]
+        
+        base_date = datetime(2023, 1, 1)
+        
+        print(f"    Generating 50,000 rows...")
+        for i in range(1, 50001):
+            order_id = f"ORD-{200000 + i}"
+            customer = customers[i % len(customers)]
+            product = products[i % len(products)]
+            quantity = (i % 100) + 1  # 1-100
+            price = 10 + (i % 990) * 10  # 10-10000
+            total = quantity * price
+            order_date = base_date + timedelta(days=i % 730, hours=i % 24)  # 2 years
+            status = statuses[i % len(statuses)]
+            region = regions[i % len(regions)]
+            
+            ws.append([order_id, customer, product, quantity, price, total, order_date, status, region])
+            
+            # Progress indicator
+            if i % 10000 == 0:
+                print(f"      {i}/50000 rows...")
+
+        # Format date column
+        for row in range(2, ws.max_row + 1):
+            ws.cell(row, 7).number_format = "DD/MM/YYYY HH:MM"
+
+        output_path = self.performance_dir / "large_50k.xlsx"
+        print(f"    Saving file...")
+        wb.save(output_path)
+        return output_path
+
+    def create_large_100k_xlsx(self) -> Path:
+        """Creates very large table with 100,000 rows for extreme stress testing.
+        
+        Tests maximum performance: statistics, filtering on large datasets.
+        Same structure as 10k/50k but with even more data.
+        """
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Orders"
+
+        # Headers
+        headers = ["Order ID", "Customer", "Product", "Quantity", "Price", "Total", "Date", "Status", "Region"]
+        ws.append(headers)
+
+        # Generate realistic data
+        customers = [f"Customer_{i:04d}" for i in range(1, 501)]  # 500 unique customers
+        products = [f"Product_{i:03d}" for i in range(1, 201)]  # 200 unique products
+        statuses = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
+        regions = ["North", "South", "East", "West", "Central", "Northeast", "Southeast", "Northwest", "Southwest", "International"]
+        
+        base_date = datetime(2022, 1, 1)
+        
+        print(f"    Generating 100,000 rows...")
+        for i in range(1, 100001):
+            order_id = f"ORD-{300000 + i}"
+            customer = customers[i % len(customers)]
+            product = products[i % len(products)]
+            quantity = (i % 100) + 1  # 1-100
+            price = 10 + (i % 990) * 10  # 10-10000
+            total = quantity * price
+            order_date = base_date + timedelta(days=i % 1095, hours=i % 24)  # 3 years
+            status = statuses[i % len(statuses)]
+            region = regions[i % len(regions)]
+            
+            ws.append([order_id, customer, product, quantity, price, total, order_date, status, region])
+            
+            # Progress indicator
+            if i % 20000 == 0:
+                print(f"      {i}/100000 rows...")
+
+        # Format date column
+        for row in range(2, ws.max_row + 1):
+            ws.cell(row, 7).number_format = "DD/MM/YYYY HH:MM"
+
+        output_path = self.performance_dir / "large_100k.xlsx"
+        print(f"    Saving file...")
+        wb.save(output_path)
+        return output_path
+
 
 def main():
     """Generates all test fixtures."""
@@ -747,6 +895,22 @@ def main():
     else:
         print(f"  ⚠️ simple_legacy.xls - skipped (xlwt not installed)")
 
+    # Performance fixtures (large files)
+    print("\n5️⃣ Performance fixtures (large files):")
+    print("  ⚠️  This may take several minutes...")
+    
+    print("\n  Creating large_10k.xlsx (10,000 rows)...")
+    fixtures_created.append(("large_10k.xlsx", builder.create_large_10k_xlsx()))
+    print(f"  ✅ large_10k.xlsx - 10,000 rows for basic performance tests")
+    
+    print("\n  Creating large_50k.xlsx (50,000 rows)...")
+    fixtures_created.append(("large_50k.xlsx", builder.create_large_50k_xlsx()))
+    print(f"  ✅ large_50k.xlsx - 50,000 rows for aggregation stress tests")
+    
+    print("\n  Creating large_100k.xlsx (100,000 rows)...")
+    fixtures_created.append(("large_100k.xlsx", builder.create_large_100k_xlsx()))
+    print(f"  ✅ large_100k.xlsx - 100,000 rows for extreme stress tests")
+
     # Summary
     print("\n" + "=" * 80)
     print(f"✅ Created {len(fixtures_created)} fixtures in {fixtures_dir}")
@@ -756,6 +920,8 @@ def main():
     print("  2. Open several files in Excel to verify")
     print("  3. Commit fixtures: git add tests/fixtures/")
     print("  4. Tests will use these static files")
+    print("\n⚠️  Note: Performance fixtures (10k/50k/100k) are large files.")
+    print("   Consider using .gitignore if they're too big for repository.")
     print()
 
 

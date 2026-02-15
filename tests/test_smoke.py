@@ -43,8 +43,8 @@ def test_registry_metadata():
     print("\n🔍 Checking registry metadata...")
     
     # Check total count
-    assert len(FIXTURES) == 17, f"Expected 17 fixtures, got {len(FIXTURES)}"
-    print(f"  ✅ Registry has 17 fixtures")
+    assert len(FIXTURES) == 20, f"Expected 20 fixtures, got {len(FIXTURES)}"
+    print(f"  ✅ Registry has 20 fixtures")
     
     # Check categories
     basic = get_fixtures_by_category("basic")

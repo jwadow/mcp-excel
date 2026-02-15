@@ -23,7 +23,7 @@
 
 Tests must be **deterministic, fast, and use NO real data**. Our testing approach is built on:
 
-**Static Fixtures:** 17 pre-generated Excel files covering all scenarios (basic, messy, edge cases, legacy). These files are committed to git and provide consistent, reproducible test data.
+**Generated Fixtures:** 20 pre-generated Excel files covering all scenarios (basic, messy, edge cases, legacy, performance). These files are NOT committed to git - they must be generated locally via `python tests/builders/generate_fixtures.py`.
 
 **Fixture Registry:** Central metadata store in `tests/fixtures/registry.py` - NO hardcoded paths or expected values in tests. All test data comes from the registry.
 
@@ -125,9 +125,14 @@ Integration tests verify end-to-end functionality. Approximately 9 files organiz
 
 ## Test Fixtures
 
-### Static Fixtures Overview
+### Fixtures Overview
 
-We use 17 pre-generated Excel files committed to git. These provide consistent, reproducible test data.
+We use 20 generated Excel files. These provide consistent, reproducible test data.
+
+**IMPORTANT:** Fixtures are NOT committed to git. You must generate them locally:
+```bash
+python tests/builders/generate_fixtures.py
+```
 
 **Categories:**
 
@@ -155,6 +160,13 @@ We use 17 pre-generated Excel files committed to git. These provide consistent, 
 
 **Legacy Format** (1 file in `tests/fixtures/legacy/`):
 - `simple_legacy.xls` - Legacy format for xlrd engine testing (5 rows)
+
+**Performance Fixtures** (3 files in `tests/fixtures/performance/`):
+- `large_10k.xlsx` - 10,000 rows for basic performance testing (Orders: ID, Customer, Product, Quantity, Price, Total, Date, Status, Region)
+- `large_50k.xlsx` - 50,000 rows for aggregation stress testing (same structure)
+- `large_100k.xlsx` - 100,000 rows for extreme stress testing (same structure)
+
+**Note:** Performance fixtures are large (~10 MB total). Generation takes 2-5 minutes. They test: filtering performance, aggregation on large datasets, statistics, cache behavior, memory usage.
 
 ### Fixture Registry
 
@@ -460,14 +472,12 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/integration/test_advanced.py` - ✅ DONE (24 tests) - rank_rows (descending/ascending, top-N, grouping, filters, edge cases), calculate_expression (addition, multiplication, division, subtraction, complex expressions, filters, edge cases, Excel formula generation)
 
 **Priority 3: Edge Cases & Performance**
-- Test all 12 filter operators with all data types
-- Test formula generation for all operators
-- Test datetime filtering with various formats
-- Test merged cells handling
-- Test multi-level headers detection
-- Test performance with large files (10k+ rows)
-- Test cache invalidation
-- Test error handling (corrupted files, missing columns, etc.)
+- `tests/fixtures/performance/large_10k.xlsx` - ✅ DONE - 10,000 rows fixture for basic performance tests
+- `tests/fixtures/performance/large_50k.xlsx` - ✅ DONE - 50,000 rows fixture for aggregation stress tests
+- `tests/fixtures/performance/large_100k.xlsx` - ✅ DONE - 100,000 rows fixture for statistics and filtering stress tests
+- `tests/integration/test_edge_cases.py` - ⏳ TODO - comprehensive merged cells handling (various merge patterns, multi-row merges, merged headers with data), multi-level headers detection (2-level, 3-level, 4-level hierarchies, mixed structures)
+- `tests/integration/test_performance.py` - ⏳ TODO - performance tests with large files for all major operations: filtering (10k rows), aggregation (50k rows), statistics (100k rows), cache performance, memory usage
+- `tests/integration/test_error_handling.py` - ⏳ TODO - corrupted Excel files, invalid file formats (.txt, .pdf as .xlsx), missing/renamed columns mid-operation, invalid operators, malformed datetime values, circular formula references
 
 ### Coverage Goals
 

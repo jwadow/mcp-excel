@@ -444,6 +444,85 @@ SIMPLE_LEGACY = FixtureMetadata(
 )
 
 # ============================================================================
+# PERFORMANCE FIXTURES
+# ============================================================================
+
+LARGE_10K = FixtureMetadata(
+    name="large_10k",
+    category="performance",
+    file_name="large_10k.xlsx",
+    format="xlsx",
+    sheet_name="Orders",
+    header_row=0,
+    columns=["Order ID", "Customer", "Product", "Quantity", "Price", "Total", "Date", "Status", "Region"],
+    row_count=10000,
+    description="Large table with 10,000 rows for basic performance testing",
+    tests=[
+        "performance_filtering",
+        "performance_aggregation",
+        "performance_statistics",
+        "cache_performance",
+    ],
+    expected={
+        "unique_customers": 100,
+        "unique_products": 50,
+        "unique_statuses": 5,
+        "unique_regions": 10,
+        "has_datetime": True,
+    }
+)
+
+LARGE_50K = FixtureMetadata(
+    name="large_50k",
+    category="performance",
+    file_name="large_50k.xlsx",
+    format="xlsx",
+    sheet_name="Orders",
+    header_row=0,
+    columns=["Order ID", "Customer", "Product", "Quantity", "Price", "Total", "Date", "Status", "Region"],
+    row_count=50000,
+    description="Large table with 50,000 rows for aggregation stress testing",
+    tests=[
+        "performance_aggregation_stress",
+        "performance_grouping",
+        "performance_complex_filters",
+        "multi_sheet_performance",
+    ],
+    expected={
+        "unique_customers": 200,
+        "unique_products": 100,
+        "unique_statuses": 5,
+        "unique_regions": 10,
+        "has_datetime": True,
+    }
+)
+
+LARGE_100K = FixtureMetadata(
+    name="large_100k",
+    category="performance",
+    file_name="large_100k.xlsx",
+    format="xlsx",
+    sheet_name="Orders",
+    header_row=0,
+    columns=["Order ID", "Customer", "Product", "Quantity", "Price", "Total", "Date", "Status", "Region"],
+    row_count=100000,
+    description="Very large table with 100,000 rows for extreme stress testing",
+    tests=[
+        "performance_extreme_stress",
+        "performance_statistics_large",
+        "performance_filtering_large",
+        "memory_usage",
+    ],
+    expected={
+        "unique_customers": 500,
+        "unique_products": 200,
+        "unique_statuses": 5,
+        "unique_regions": 10,
+        "has_datetime": True,
+    }
+)
+
+# ============================================================================
 # REGISTRY
 # ============================================================================
 
@@ -472,6 +551,11 @@ FIXTURES: Dict[str, FixtureMetadata] = {
     
     # Legacy
     "simple_legacy": SIMPLE_LEGACY,
+    
+    # Performance
+    "large_10k": LARGE_10K,
+    "large_50k": LARGE_50K,
+    "large_100k": LARGE_100K,
 }
 
 

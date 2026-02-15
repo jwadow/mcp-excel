@@ -44,13 +44,11 @@ _notes/
 test_data/
 sample_files/
 
-# Excel files (ignore everywhere except test fixtures)
+# Excel files (all ignored, including test fixtures)
+# Test fixtures are generated via: python tests/builders/generate_fixtures.py
 *.xls
 *.xlsx
 *.xlsm
-!tests/fixtures/**/*.xls
-!tests/fixtures/**/*.xlsx
-!tests/fixtures/**/*.xlsm
 
 # Excel temp files (created when file is open)
 ~$*.xls*

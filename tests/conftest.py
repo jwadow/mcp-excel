@@ -187,6 +187,24 @@ def simple_legacy_fixture() -> FixtureMetadata:
     return get_fixture("simple_legacy")
 
 
+@pytest.fixture
+def large_10k_fixture() -> FixtureMetadata:
+    """Large table with 10,000 rows for performance testing."""
+    return get_fixture("large_10k")
+
+
+@pytest.fixture
+def large_50k_fixture() -> FixtureMetadata:
+    """Large table with 50,000 rows for stress testing."""
+    return get_fixture("large_50k")
+
+
+@pytest.fixture
+def large_100k_fixture() -> FixtureMetadata:
+    """Very large table with 100,000 rows for extreme stress testing."""
+    return get_fixture("large_100k")
+
+
 # ============================================================================
 # FIXTURE COLLECTIONS (By category)
 # ============================================================================
@@ -213,6 +231,12 @@ def edge_case_fixtures() -> list[FixtureMetadata]:
 def legacy_fixtures() -> list[FixtureMetadata]:
     """All legacy format fixtures."""
     return get_fixtures_by_category("legacy")
+
+
+@pytest.fixture
+def performance_fixtures() -> list[FixtureMetadata]:
+    """All performance fixtures (large files)."""
+    return get_fixtures_by_category("performance")
 
 
 @pytest.fixture
