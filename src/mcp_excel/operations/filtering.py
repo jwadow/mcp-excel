@@ -35,7 +35,8 @@ class FilterEngine:
             logic: Logic operator ("AND" or "OR")
 
         Returns:
-            Filtered DataFrame
+            NEW DataFrame (copy) containing only filtered rows.
+            Caller owns the returned DataFrame and can modify it freely.
 
         Raises:
             ValueError: If filter is invalid
@@ -61,7 +62,8 @@ class FilterEngine:
         else:
             raise ValueError(f"Invalid logic operator: {logic}. Must be 'AND' or 'OR'")
 
-        return df[combined_mask]
+        # Return explicit copy for clear ownership (architectural principle)
+        return df[combined_mask].copy()
 
     def count_filtered(
         self,

@@ -1614,7 +1614,39 @@ df.columns = [str(col) for col in df.columns]
 
 **Где:** `calculate_expression` использует `pandas.eval()`, не `eval()`.
 
-### 17.4. Экранирование в Excel-формулах
+### 17.4. Принцип владения данными (Data Ownership)
+
+**Проблема:** Pandas различает view (представление) и copy (копию) DataFrame. Модификация view вызывает `SettingWithCopyWarning` и может привести к непредсказуемому поведению.
+
+**Архитектурный принцип:** Операции, которые **сокращают** набор данных (фильтрация, выборка), должны возвращать **копию** DataFrame. Вызывающий код владеет результатом и может его свободно модифицировать.
+
+**Реализация в FilterEngine:**
+
+```python
+def apply_filters(self, df: pd.DataFrame, filters: list[FilterCondition], logic: str = "AND") -> pd.DataFrame:
+    """Apply filters to DataFrame.
+    
+    Returns:
+        NEW DataFrame (copy) containing filtered rows. Caller owns the result.
+    """
+    if not filters:
+        return df  # No filters = no copy needed
+    
+    # ... build masks ...
+    
+    # Return explicit copy for clear ownership
+    return df[combined_mask].copy()
+```
+
+**Обоснование:**
+- Устанавливает чёткий контракт: "операции сокращения возвращают владение"
+- Вызывающий код может модифицировать результат без побочных эффектов
+- Исключает целый класс багов с неожиданными изменениями данных
+- Применимо ко всем будущим операциям сокращения данных
+
+**Где применяется:** `FilterEngine.apply_filters()` - единственное место, где создаётся копия. Все операции (`timeseries`, `statistics`, `advanced`) используют этот компонент и получают данные, которыми владеют.
+
+### 17.5. Экранирование в Excel-формулах
 
 **Проблема:** Formula injection через пользовательские значения.
 
@@ -1622,7 +1654,7 @@ df.columns = [str(col) for col in df.columns]
 
 **Защита:** Значения начинающиеся с `=`, `+`, `-`, `@` префиксируются апострофом.
 
-### 17.5. Динамическое количество параметров
+### 17.6. Динамическое количество параметров
 
 **Проблема:** Хардкод количества колонок (например, `group_by` только для 2 колонок).
 
@@ -1630,7 +1662,7 @@ df.columns = [str(col) for col in df.columns]
 
 **Примеры:** `group_by(group_columns=[...])`, `correlate(columns=[...])`.
 
-### 17.6. Генерация букв колонок Excel
+### 17.7. Генерация букв колонок Excel
 
 **Проблема:** `chr(65 + col_idx)` работает только для A-Z (26 колонок).
 
@@ -1638,7 +1670,7 @@ df.columns = [str(col) for col in df.columns]
 
 **Где:** `FormulaGenerator`, все операции генерирующие формулы.
 
-### 17.7. Инициализация FormulaGenerator
+### 17.8. Инициализация FormulaGenerator
 
 **Проблема:** `FormulaGenerator` требует `sheet_name` в конструкторе.
 
