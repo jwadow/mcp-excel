@@ -263,7 +263,7 @@ class FormulaGenerator:
         column_ranges: dict[str, str],
         target_range: Optional[str] = None,
         column_types: Optional[dict[str, str]] = None,
-    ) -> str:
+    ) -> Optional[str]:
         """Generate formula from filter conditions.
 
         Args:
@@ -274,7 +274,7 @@ class FormulaGenerator:
             column_types: Optional mapping of column names to types (for datetime handling)
 
         Returns:
-            Excel formula
+            Excel formula string, or None if filters use operators not supported in Excel
 
         Raises:
             ValueError: If operation is not supported or parameters are invalid
@@ -316,8 +316,12 @@ class FormulaGenerator:
         filter_cond: FilterCondition,
         criteria_range: str,
         target_range: Optional[str],
-    ) -> str:
-        """Generate formula for single filter condition."""
+    ) -> Optional[str]:
+        """Generate formula for single filter condition.
+        
+        Returns:
+            Excel formula string, or None if operator is not supported in Excel
+        """
         operator = filter_cond.operator
         
         # Comparison operators: ==, !=, >, <, >=, <=
@@ -439,9 +443,9 @@ class FormulaGenerator:
             elif operation == "mean" and target_range:
                 return f"=AVERAGE({target_range})"
         
-        # Regex - not supported in Excel
+        # Regex - not supported in Excel formulas, but works in Python filtering
         elif operator == "regex":
-            return "=NA()  // Regex not supported in Excel formulas"
+            return None
         
         else:
             return f"=NA()  // Operator '{operator}' not supported"
@@ -452,19 +456,36 @@ class FormulaGenerator:
         filters: list[FilterCondition],
         column_ranges: dict[str, str],
         target_range: Optional[str],
-    ) -> str:
-        """Generate formula for multiple filter conditions."""
-        # Operators supported in COUNTIFS/SUMIFS with wildcards
-        simple_operators = ["==", "!=", ">", "<", ">=", "<=", "contains", "startswith", "endswith"]
+    ) -> Optional[str]:
+        """Generate formula for multiple filter conditions.
         
+        Returns:
+            Excel formula string, or None if filters contain operators not supported in Excel
+        """
+        # Operators supported in Excel formulas (COUNTIFS/SUMIFS with wildcards)
+        excel_supported = ["==", "!=", ">", "<", ">=", "<=", "contains", "startswith", "endswith"]
+        
+        # Operators that work in Python filtering but not in Excel formulas
+        python_only = ["regex", "in", "not_in", "is_null", "is_not_null"]
+        
+        # Check if any filter uses python_only operators
+        has_python_only = any(f.operator in python_only for f in filters)
+        
+        if has_python_only:
+            # Python filtering works correctly, but Excel formula cannot be generated
+            return None
+        
+        # Check for truly unsupported operators
+        for filter_cond in filters:
+            if filter_cond.operator not in (excel_supported + python_only):
+                # Unknown operator - this is an error
+                return f"=NA()  // Unsupported operator: '{filter_cond.operator}'"
+        
+        # All operators are Excel-supported - generate formula
         criteria_ranges = []
         criteria_values = []
         
         for filter_cond in filters:
-            if filter_cond.operator not in simple_operators:
-                # Complex operators not supported in COUNTIFS/SUMIFS
-                return f"=NA()  // Multiple filters with '{filter_cond.operator}' not supported"
-            
             criteria_range = column_ranges.get(filter_cond.column)
             if not criteria_range:
                 continue

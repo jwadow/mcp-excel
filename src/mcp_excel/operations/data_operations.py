@@ -220,16 +220,13 @@ class DataOperations(BaseOperations):
                     filter_cond.column, col_idx
                 )
 
-        try:
-            formula = formula_gen.generate_from_filter(
-                operation="count",
-                filters=request.filters,
-                column_ranges=column_ranges,
-                column_types=column_types,
-            )
-        except ValueError:
-            # Complex filter not supported in formula
-            formula = None
+        # Generate formula (returns None if filters use operators not supported in Excel)
+        formula = formula_gen.generate_from_filter(
+            operation="count",
+            filters=request.filters,
+            column_ranges=column_ranges,
+            column_types=column_types,
+        )
 
         # Generate TSV output
         filter_summary = self._filter_engine.get_filter_summary(request.filters, request.logic)
@@ -462,17 +459,14 @@ class DataOperations(BaseOperations):
         else:
             target_range = None
 
-        try:
-            formula = formula_gen.generate_from_filter(
-                operation=operation,
-                filters=request.filters,
-                column_ranges=column_ranges,
-                target_range=target_range,
-                column_types=column_types,
-            )
-        except ValueError:
-            # Complex filter not supported in formula
-            formula = None
+        # Generate formula (returns None if filters use operators not supported in Excel)
+        formula = formula_gen.generate_from_filter(
+            operation=operation,
+            filters=request.filters,
+            column_ranges=column_ranges,
+            target_range=target_range,
+            column_types=column_types,
+        )
 
         # Generate TSV output
         tsv = self._tsv_formatter.format_single_value(
