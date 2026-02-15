@@ -457,7 +457,7 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/integration/test_validation.py` - ✅ DONE (24 tests) - find_duplicates (single/multiple columns, row indices, TSV output), find_nulls (null statistics, percentage calculation, indices limit)
 - `tests/integration/test_multisheet.py` - ✅ DONE (21 tests) - find_column, search_across_sheets, compare_sheets
 - `tests/integration/test_timeseries.py` - ✅ DONE (24 tests) - calculate_period_change (month/quarter/year periods, filters), calculate_running_total (basic, with grouping, filters), calculate_moving_average (various window sizes, datetime ordering, filters), edge cases with messy headers
-- `tests/integration/test_advanced.py` - rank_rows, calculate_expression
+- `tests/integration/test_advanced.py` - ✅ DONE (24 tests) - rank_rows (descending/ascending, top-N, grouping, filters, edge cases), calculate_expression (addition, multiplication, division, subtraction, complex expressions, filters, edge cases, Excel formula generation)
 
 **Priority 3: Edge Cases & Performance**
 - Test all 12 filter operators with all data types
