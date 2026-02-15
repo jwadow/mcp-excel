@@ -445,8 +445,8 @@ git commit -m "test: add my_new_fixture for [feature]"
 - `tests/unit/core/test_datetime_detector.py` - ✅ DONE (16 tests)
 - `tests/unit/core/test_datetime_converter.py` - ✅ DONE (14 tests)
 - `tests/unit/operations/test_filter_engine.py` - ✅ DONE (46 tests)
-- `tests/unit/excel/test_formula_generator.py` - FormulaGenerator (all formula types)
-- `tests/unit/excel/test_tsv_formatter.py` - TSVFormatter (TSV generation)
+- `tests/unit/excel/test_formula_generator.py` - ✅ DONE (40 tests)
+- `tests/unit/excel/test_tsv_formatter.py` - ✅ DONE (26 tests)
 
 **Priority 2: Operations (Integration Tests)**
 - `tests/integration/test_file_inspection.py` - inspect_file, get_sheet_info, get_column_names, get_data_profile
