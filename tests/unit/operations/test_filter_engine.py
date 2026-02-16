@@ -1068,3 +1068,170 @@ def test_normalize_method_combined(filter_engine):
     assert "\u00A0" not in result, "Should remove non-breaking space"
     assert not result.startswith(" "), "Should remove leading space"
     assert not result.endswith(" "), "Should remove trailing space"
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_filter_negate_equals(filter_engine, sample_df):
+    """Test negation with == operator (NOT equals)."""
+    print(f"\n📂 Testing negation with == operator")
+    
+    filters = [FilterCondition(column="Name", operator="==", value="Alice", negate=True)]
+    result = filter_engine.apply_filters(sample_df, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should return all rows EXCEPT Alice
+    assert len(result) == len(sample_df) - 1, "Should exclude Alice"
+    assert "Alice" not in result["Name"].values, "Alice should not be in results"
+
+
+def test_filter_negate_greater_than(filter_engine, sample_df):
+    """Test negation with > operator (NOT greater than = <=)."""
+    print(f"\n📂 Testing negation with > operator")
+    
+    filters = [FilterCondition(column="Age", operator=">", value=30, negate=True)]
+    result = filter_engine.apply_filters(sample_df, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should return rows where Age <= 30
+    assert all(result["Age"] <= 30), "All ages should be <= 30"
+
+
+def test_filter_negate_in(filter_engine, sample_df):
+    """Test negation with 'in' operator (NOT IN)."""
+    print(f"\n📂 Testing negation with 'in' operator")
+    
+    filters = [FilterCondition(column="Name", operator="in", values=["Alice", "Bob"], negate=True)]
+    result = filter_engine.apply_filters(sample_df, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should return all rows EXCEPT Alice and Bob
+    assert "Alice" not in result["Name"].values, "Alice should not be in results"
+    assert "Bob" not in result["Name"].values, "Bob should not be in results"
+    assert len(result) == len(sample_df) - 2, "Should exclude Alice and Bob"
+
+
+def test_filter_negate_contains(filter_engine, sample_df):
+    """Test negation with 'contains' operator."""
+    print(f"\n📂 Testing negation with 'contains' operator")
+    
+    filters = [FilterCondition(column="City", operator="contains", value="on", negate=True)]
+    result = filter_engine.apply_filters(sample_df, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should return rows where City does NOT contain "on"
+    assert all("on" not in str(city) for city in result["City"].values), "No city should contain 'on'"
+
+
+def test_filter_negate_is_null(filter_engine, df_with_nulls):
+    """Test negation with 'is_null' operator (NOT NULL = is_not_null)."""
+    print(f"\n📂 Testing negation with 'is_null' operator")
+    
+    filters = [FilterCondition(column="Name", operator="is_null", negate=True)]
+    result = filter_engine.apply_filters(df_with_nulls, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should return rows where Name is NOT null
+    assert result["Name"].notna().all(), "All names should be non-null"
+
+
+def test_filter_negate_with_and_logic(filter_engine, sample_df):
+    """Test negation combined with AND logic."""
+    print(f"\n📂 Testing negation with AND logic")
+    
+    filters = [
+        FilterCondition(column="Age", operator=">", value=25),
+        FilterCondition(column="City", operator="==", value="Moscow", negate=True)
+    ]
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Age > 25 AND City != "Moscow"
+    assert all(result["Age"] > 25), "All ages should be > 25"
+    assert "Moscow" not in result["City"].values, "Moscow should not be in results"
+
+
+def test_filter_negate_with_or_logic(filter_engine, sample_df):
+    """Test negation combined with OR logic."""
+    print(f"\n📂 Testing negation with OR logic")
+    
+    filters = [
+        FilterCondition(column="Age", operator="<", value=25, negate=True),
+        FilterCondition(column="Active", operator="==", value=False)
+    ]
+    result = filter_engine.apply_filters(sample_df, filters, logic="OR")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Age >= 25 OR Active == False
+    assert all((row["Age"] >= 25) or (row["Active"] == False) for _, row in result.iterrows()), \
+        "Each row should satisfy: Age >= 25 OR Active == False"
+
+
+def test_filter_multiple_negations(filter_engine, sample_df):
+    """Test multiple negated conditions."""
+    print(f"\n📂 Testing multiple negations")
+    
+    filters = [
+        FilterCondition(column="Name", operator="==", value="Alice", negate=True),
+        FilterCondition(column="City", operator="==", value="Moscow", negate=True)
+    ]
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Name != "Alice" AND City != "Moscow"
+    assert "Alice" not in result["Name"].values, "Alice should not be in results"
+    assert "Moscow" not in result["City"].values, "Moscow should not be in results"
+
+
+def test_get_filter_summary_with_negation(filter_engine):
+    """Test filter summary includes NOT for negated conditions."""
+    print(f"\n📂 Testing get_filter_summary with negation")
+    
+    filters = [
+        FilterCondition(column="Age", operator=">", value=30, negate=True),
+        FilterCondition(column="Status", operator="==", value="Active")
+    ]
+    summary = filter_engine.get_filter_summary(filters, "AND")
+    
+    print(f"✅ Summary: {summary}")
+    
+    assert "NOT" in summary, "Summary should contain NOT"
+    assert "Age > 30" in summary, "Summary should contain Age > 30"
+    assert "Status == Active" in summary, "Summary should contain Status == Active"
+
+
+def test_count_filtered_with_negation(filter_engine, sample_df):
+    """Test count_filtered with negated condition."""
+    print(f"\n📂 Testing count_filtered with negation")
+    
+    filters = [FilterCondition(column="Age", operator=">", value=30, negate=True)]
+    count = filter_engine.count_filtered(sample_df, filters)
+    
+    print(f"✅ Count: {count}")
+    
+    # Should count rows where Age <= 30
+    expected = len(sample_df[sample_df["Age"] <= 30])
+    assert count == expected, f"Count should be {expected}"
+
+
+def test_validate_filters_with_negation(filter_engine, sample_df):
+    """Test validation works with negated filters."""
+    print(f"\n📂 Testing validate_filters with negation")
+    
+    filters = [FilterCondition(column="Age", operator=">", value=30, negate=True)]
+    is_valid, error = filter_engine.validate_filters(sample_df, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is True, "Negated filter should be valid"
+    assert error is None, "Should have no error"

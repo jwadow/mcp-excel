@@ -109,7 +109,8 @@ class FormulaGenerator:
                             column=filter_cond.column,
                             operator=filter_cond.operator,
                             value=converted_value,
-                            values=filter_cond.values
+                            values=filter_cond.values,
+                            negate=filter_cond.negate
                         )
                     except Exception:
                         # If conversion fails, keep original value
@@ -131,7 +132,8 @@ class FormulaGenerator:
                         column=filter_cond.column,
                         operator=filter_cond.operator,
                         value=filter_cond.value,
-                        values=converted_values
+                        values=converted_values,
+                        negate=filter_cond.negate
                     )
             
             converted_filters.append(filter_cond)
@@ -332,6 +334,11 @@ class FormulaGenerator:
         Returns:
             Excel formula string, or None if operator is not supported in Excel
         """
+        # Negation is not supported in Excel formulas (too complex)
+        # Python filtering works correctly, but Excel formula cannot be generated
+        if filter_cond.negate:
+            return None
+        
         operator = filter_cond.operator
         
         # Comparison operators: ==, !=, >, <, >=, <=
@@ -472,6 +479,14 @@ class FormulaGenerator:
         Returns:
             Excel formula string, or None if filters contain operators not supported in Excel
         """
+        # Check if any filter uses negation (NOT operator)
+        has_negation = any(f.negate for f in filters)
+        
+        if has_negation:
+            # Negation is not supported in Excel formulas (too complex)
+            # Python filtering works correctly, but Excel formula cannot be generated
+            return None
+        
         # Operators supported in Excel formulas (COUNTIFS/SUMIFS with wildcards)
         excel_supported = ["==", "!=", ">", "<", ">=", "<=", "contains", "startswith", "endswith"]
         

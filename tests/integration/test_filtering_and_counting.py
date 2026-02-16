@@ -1665,3 +1665,139 @@ def test_filter_and_count_batch_metadata(simple_fixture, file_loader):
     assert response.metadata.sheet_name == simple_fixture.sheet_name, "Should report correct sheet"
     assert response.performance is not None, "Should include performance metrics"
     assert response.performance.execution_time_ms > 0, "Should have execution time"
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_filter_and_count_with_negation(simple_fixture, file_loader):
+    """Test filter_and_count with negated condition.
+    
+    Verifies:
+    - Negation works correctly in end-to-end flow
+    - Count excludes negated values
+    - Formula is None (negation not supported in Excel)
+    """
+    print(f"\n🔍 Testing filter_and_count with negation")
+    
+    ops = DataOperations(file_loader)
+    
+    # Get a test value
+    from mcp_excel.models.requests import GetUniqueValuesRequest
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: {simple_fixture.columns[0]} == '{test_value}' (negated)")
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value, negate=True)
+        ],
+        logic="AND"
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}")
+    print(f"   Formula: {response.excel_output.formula}")
+    
+    # Should count all rows EXCEPT test_value
+    expected_count = simple_fixture.row_count - 1  # Assuming test_value appears once
+    assert response.count <= expected_count, "Count should exclude negated value"
+    
+    # Formula should be None (negation not supported in Excel)
+    assert response.excel_output.formula is None, "Formula should be None for negation"
+
+
+def test_filter_and_count_mixed_negation(numeric_types_fixture, file_loader):
+    """Test filter_and_count with mixed negated and non-negated conditions.
+    
+    Verifies:
+    - Mixed negation works correctly
+    - Logic: Количество > 50 AND NOT (Количество < 150) = Количество >= 150
+    - Formula is None when any filter has negation
+    """
+    print(f"\n🔍 Testing filter_and_count with mixed negation")
+    
+    ops = DataOperations(file_loader)
+    
+    request = FilterAndCountRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filters=[
+            FilterCondition(column="Количество", operator=">", value=50),
+            FilterCondition(column="Количество", operator="<", value=150, negate=True)
+        ],
+        logic="AND"
+    )
+    
+    response = ops.filter_and_count(request)
+    
+    print(f"✅ Count: {response.count}")
+    print(f"   Formula: {response.excel_output.formula}")
+    
+    # Количество > 50 AND NOT (Количество < 150) = Количество >= 150
+    assert response.count > 0, "Should find rows with Количество >= 150"
+    assert response.excel_output.formula is None, "Formula should be None when any filter has negation"
+
+
+def test_filter_and_count_batch_with_negation(simple_fixture, file_loader):
+    """Test filter_and_count_batch with negated conditions.
+    
+    Verifies:
+    - Batch processing works with negation
+    - Each filter set with negation returns None formula
+    - Counts are correct
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with negation")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=3
+    )
+    values = ops.get_unique_values(unique_request).values[:3]
+    
+    print(f"  Testing batch with negated filters")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Not A",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0], negate=True)]
+            ),
+            FilterSet(
+                label="Not B",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1], negate=True)]
+            )
+        ]
+    )
+    
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results:")
+    for result in response.results:
+        print(f"   {result.label}: {result.count} rows, formula: {result.formula}")
+    
+    assert len(response.results) == 2, "Should process 2 filter sets"
+    # Formulas should be None for negated filters
+    assert all(r.formula is None for r in response.results), "All formulas should be None for negation"
+    # Counts should be positive (excluding negated values)
+    assert all(r.count > 0 for r in response.results), "All counts should be positive"

@@ -1205,3 +1205,84 @@ def test_group_by_unicode_column_not_found(simple_fixture, file_loader):
     
     assert "not found" in error_msg, "Should mention column not found"
     assert "Гарод" in error_msg, "Should mention the typo column"
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_aggregate_with_negated_filter(numeric_types_fixture, file_loader):
+    """Test aggregate with negated filter condition.
+    
+    Verifies:
+    - Negation works correctly in aggregate
+    - Aggregates only rows satisfying negated condition
+    - Formula is None (negation not supported in Excel)
+    """
+    print(f"\n🔍 Testing aggregate with negated filter")
+    
+    ops = DataOperations(file_loader)
+    
+    request = AggregateRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        operation="sum",
+        target_column="Количество",
+        filters=[
+            FilterCondition(column="Количество", operator="<", value=100, negate=True)
+        ]
+    )
+    
+    response = ops.aggregate(request)
+    
+    print(f"✅ Sum: {response.value}")
+    print(f"   Formula: {response.excel_output.formula}")
+    
+    # Should sum rows where Количество >= 100
+    assert response.value > 0, "Sum should be positive"
+    assert response.excel_output.formula is None, "Formula should be None for negation"
+
+
+def test_group_by_with_negated_filter(simple_fixture, file_loader):
+    """Test group_by with negated filter.
+    
+    Verifies:
+    - Negation works correctly in group_by
+    - Groups exclude negated values
+    - Results are correct
+    """
+    print(f"\n🔍 Testing group_by with negated filter")
+    
+    ops = DataOperations(file_loader)
+    
+    # Get a test value to exclude
+    from mcp_excel.models.requests import GetUniqueValuesRequest
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: {simple_fixture.columns[0]} == '{test_value}' (negated)")
+    
+    request = GroupByRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        group_columns=[simple_fixture.columns[0]],
+        agg_column=simple_fixture.columns[1],
+        agg_operation="count",
+        filters=[
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value, negate=True)
+        ]
+    )
+    
+    response = ops.group_by(request)
+    
+    print(f"✅ Groups: {len(response.groups)}")
+    
+    # test_value should not be in results
+    assert all(group[simple_fixture.columns[0]] != test_value for group in response.groups), \
+        f"No group should have {simple_fixture.columns[0]} == {test_value}"
+    assert len(response.groups) > 0, "Should have some groups"

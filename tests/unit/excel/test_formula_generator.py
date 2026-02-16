@@ -1092,3 +1092,62 @@ def test_operator_not_in_empty_values():
     assert "NA()" in formula, "'not_in' with empty values should return NA()"
     print(f"   Formula: {formula}")
     print("✅ 'not_in' operator with empty values handled correctly")
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_formula_generation_returns_none_with_negation():
+    """Test that formula generation returns None when negate=True."""
+    print("\n📂 Testing formula generation with negation")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$A:$A"}
+    
+    filters = [FilterCondition(column="Status", operator="==", value="Active", negate=True)]
+    formula = gen.generate_from_filter("count", filters, column_ranges)
+    
+    print(f"   Formula: {formula}")
+    
+    # Formula should not be generated for negation
+    assert formula is None, "Formula should be None when negate=True"
+    print("✅ Formula generation correctly returns None for negation")
+
+
+def test_formula_generation_multiple_filters_with_negation():
+    """Test that formula returns None when any filter has negate=True."""
+    print("\n📂 Testing formula generation with multiple filters (one negated)")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$A:$A", "Age": "Sheet1!$B:$B"}
+    
+    filters = [
+        FilterCondition(column="Status", operator="==", value="Active"),
+        FilterCondition(column="Age", operator=">", value=30, negate=True)
+    ]
+    formula = gen.generate_from_filter("count", filters, column_ranges)
+    
+    print(f"   Formula: {formula}")
+    
+    # Formula should not be generated if any filter has negate=True
+    assert formula is None, "Formula should be None when any filter has negate=True"
+    print("✅ Formula generation correctly returns None when any filter is negated")
+
+
+def test_convert_datetime_filters_preserves_negate():
+    """Test that datetime conversion preserves negate field."""
+    print("\n📂 Testing datetime conversion preserves negate")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_types = {"Date": "datetime"}
+    
+    filters = [FilterCondition(column="Date", operator=">=", value="2024-01-01", negate=True)]
+    converted = gen._convert_datetime_filters(filters, column_types)
+    
+    print(f"   Original negate: {filters[0].negate}")
+    print(f"   Converted negate: {converted[0].negate}")
+    
+    # negate should be preserved after conversion
+    assert converted[0].negate == True, "negate field should be preserved after datetime conversion"
+    print("✅ Datetime conversion preserves negate field")

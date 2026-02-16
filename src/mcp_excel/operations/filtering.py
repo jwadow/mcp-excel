@@ -202,17 +202,17 @@ class FilterEngine:
 
         # Comparison operators
         if operator == "==":
-            return col_data == filter_value
+            mask = col_data == filter_value
         elif operator == "!=":
-            return col_data != filter_value
+            mask = col_data != filter_value
         elif operator == ">":
-            return col_data > filter_value
+            mask = col_data > filter_value
         elif operator == "<":
-            return col_data < filter_value
+            mask = col_data < filter_value
         elif operator == ">=":
-            return col_data >= filter_value
+            mask = col_data >= filter_value
         elif operator == "<=":
-            return col_data <= filter_value
+            mask = col_data <= filter_value
 
         # Set operators
         elif operator == "in":
@@ -222,7 +222,7 @@ class FilterEngine:
             values = filter_cond.values
             if pd.api.types.is_datetime64_any_dtype(col_data):
                 values = [self._parse_datetime_value(v) for v in values]
-            return col_data.isin(values)
+            mask = col_data.isin(values)
         elif operator == "not_in":
             if not filter_cond.values:
                 raise ValueError("'not_in' operator requires 'values' parameter")
@@ -230,37 +230,43 @@ class FilterEngine:
             values = filter_cond.values
             if pd.api.types.is_datetime64_any_dtype(col_data):
                 values = [self._parse_datetime_value(v) for v in values]
-            return ~col_data.isin(values)
+            mask = ~col_data.isin(values)
 
         # String operators
         elif operator == "contains":
             if not isinstance(filter_cond.value, str):
                 raise ValueError("'contains' operator requires string value")
-            return col_data.astype(str).str.contains(filter_cond.value, na=False, regex=False)
+            mask = col_data.astype(str).str.contains(filter_cond.value, na=False, regex=False)
         elif operator == "startswith":
             if not isinstance(filter_cond.value, str):
                 raise ValueError("'startswith' operator requires string value")
-            return col_data.astype(str).str.startswith(filter_cond.value, na=False)
+            mask = col_data.astype(str).str.startswith(filter_cond.value, na=False)
         elif operator == "endswith":
             if not isinstance(filter_cond.value, str):
                 raise ValueError("'endswith' operator requires string value")
-            return col_data.astype(str).str.endswith(filter_cond.value, na=False)
+            mask = col_data.astype(str).str.endswith(filter_cond.value, na=False)
         elif operator == "regex":
             if not isinstance(filter_cond.value, str):
                 raise ValueError("'regex' operator requires string value")
             try:
-                return col_data.astype(str).str.contains(filter_cond.value, na=False, regex=True)
+                mask = col_data.astype(str).str.contains(filter_cond.value, na=False, regex=True)
             except re.error as e:
                 raise ValueError(f"Invalid regex pattern: {e}")
 
         # Null operators
         elif operator == "is_null":
-            return col_data.isna()
+            mask = col_data.isna()
         elif operator == "is_not_null":
-            return col_data.notna()
+            mask = col_data.notna()
 
         else:
             raise ValueError(f"Unsupported operator: {operator}")
+        
+        # Apply negation if requested (NOT operator)
+        if filter_cond.negate:
+            mask = ~mask
+        
+        return mask
 
     def validate_filters(
         self, df: pd.DataFrame, filters: list[FilterCondition]
@@ -344,11 +350,17 @@ class FilterEngine:
         for f in filters:
             if f.operator in ["in", "not_in"]:
                 value_str = f", ".join(str(v) for v in (f.values or []))
-                parts.append(f"{f.column} {f.operator} [{value_str}]")
+                condition = f"{f.column} {f.operator} [{value_str}]"
             elif f.operator in ["is_null", "is_not_null"]:
-                parts.append(f"{f.column} {f.operator}")
+                condition = f"{f.column} {f.operator}"
             else:
-                parts.append(f"{f.column} {f.operator} {f.value}")
+                condition = f"{f.column} {f.operator} {f.value}"
+            
+            # Apply negation if requested
+            if f.negate:
+                condition = f"NOT ({condition})"
+            
+            parts.append(condition)
 
         return f" {logic} ".join(parts)
     

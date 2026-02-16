@@ -383,6 +383,7 @@ def test_filter_comparison_without_value(simple_fixture, file_loader):
         operator = ">"
         value = None  # Missing value
         values = None
+        negate = False  # Required field
     
     # Act - pandas handles None gracefully, returns False for all comparisons
     mask = filter_engine._build_filter_mask(df, FilterWithoutValue())
@@ -759,6 +760,7 @@ def test_invalid_logic_operator_in_filter(simple_fixture, file_loader):
         operator = "=="
         value = "test"
         values = None
+        negate = False  # Required field
     
     # Act & Assert
     with pytest.raises(ValueError) as exc_info:

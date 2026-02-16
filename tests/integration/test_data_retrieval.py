@@ -1667,3 +1667,55 @@ def test_filter_and_get_rows_legacy_format(simple_legacy_fixture, file_loader):
     print(f"✅ Returned rows from .xls: {response.count}")
     
     assert response.count > 0, "Should return rows from .xls file"
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_filter_and_get_rows_with_negation(simple_fixture, file_loader):
+    """Test filter_and_get_rows with negated condition.
+    
+    Verifies:
+    - Negation works correctly in filter_and_get_rows
+    - Returned rows exclude negated values
+    - All returned rows satisfy the negated condition
+    """
+    print(f"\n🔍 Testing filter_and_get_rows with negation")
+    
+    ops = DataOperations(file_loader)
+    
+    # Get a test value
+    from mcp_excel.models.requests import GetUniqueValuesRequest
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: {simple_fixture.columns[0]} == '{test_value}' (negated)")
+    
+    # Act
+    request = FilterAndGetRowsRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value, negate=True)
+        ],
+        columns=None,
+        limit=50,
+        offset=0,
+        logic="AND"
+    )
+    
+    response = ops.filter_and_get_rows(request)
+    
+    # Assert
+    print(f"✅ Returned {response.count} rows")
+    
+    # All returned rows should NOT contain test_value
+    assert all(row[simple_fixture.columns[0]] != test_value for row in response.rows), \
+        f"No row should have {simple_fixture.columns[0]} == {test_value}"
+    assert response.count > 0, "Should return some rows"

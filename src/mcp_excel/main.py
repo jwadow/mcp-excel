@@ -62,6 +62,8 @@ OPERATOR_DESCRIPTION = """Comparison operator for filtering data.
 
 OPERATORS: ==, !=, >, <, >=, <= (comparison) | in, not_in (set) | contains, startswith, endswith, regex (string) | is_null, is_not_null (null check)
 
+NEGATION: Use 'negate: true' to invert any condition (NOT operator). Example: {"column": "Status", "operator": "==", "value": "Active", "negate": true} means Status != "Active"
+
 CRITICAL - NULL vs PLACEHOLDER DISTINCTION:
 - is_null: detects ONLY real empty cells (NaN/None in pandas)
 - is_not_null: matches everything that's not empty, INCLUDING placeholders
@@ -107,6 +109,11 @@ FILTER_SCHEMA = {
             "values": {
                 "type": "array",
                 "description": "List of values for set operators (in, not_in). Example: ['Active', 'Pending']"
+            },
+            "negate": {
+                "type": "boolean",
+                "default": False,
+                "description": "Negate the condition (NOT operator). Inverts the result of the filter."
             }
         },
         "required": ["column", "operator"]

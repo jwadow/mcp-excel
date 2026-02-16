@@ -902,4 +902,73 @@ def test_rank_rows_and_calculate_expression_combined(numeric_types_fixture, file
     print(f"   Combined workflow completed successfully")
 
 
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_rank_rows_with_negation(numeric_types_fixture, file_loader):
+    """Test rank_rows with negated filter.
+    
+    Verifies:
+    - Ranking calculated only for filtered rows
+    - Negation works correctly in ranking context
+    """
+    print(f"\n🔍 Testing rank_rows with negation")
+    
+    ops = AdvancedOperations(file_loader)
+    
+    request = RankRowsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        rank_column="Количество",
+        direction="desc",
+        top_n=10,
+        group_by_columns=None,
+        filters=[
+            FilterCondition(column="Количество", operator="<", value=100, negate=True)
+        ],
+        logic="AND"
+    )
+    
+    response = ops.rank_rows(request)
+    
+    print(f"✅ Ranked {response.total_rows} rows with negation")
+    
+    # All returned rows should have Количество >= 100
+    assert all(row["Количество"] >= 100 for row in response.rows), \
+        "All rows should have Количество >= 100"
+    assert response.total_rows > 0, "Should rank some rows"
+
+
+def test_calculate_expression_with_negation(numeric_types_fixture, file_loader):
+    """Test calculate_expression with negated filter.
+    
+    Verifies:
+    - Expression calculated only for filtered rows
+    - Negation works correctly
+    """
+    print(f"\n🔍 Testing calculate_expression with negation")
+    
+    ops = AdvancedOperations(file_loader)
+    
+    request = CalculateExpressionRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        expression="Количество * Цена",
+        output_column_name="Стоимость",
+        filters=[
+            FilterCondition(column="Количество", operator="<", value=50, negate=True)
+        ]
+    )
+    
+    response = ops.calculate_expression(request)
+    
+    print(f"✅ Calculated expression for {len(response.rows)} rows with negation")
+    
+    # All returned rows should have Количество >= 50
+    assert all(row["Количество"] >= 50 for row in response.rows), \
+        "All rows should have Количество >= 50"
+    assert len(response.rows) > 0, "Should calculate for some rows"
+
+
 

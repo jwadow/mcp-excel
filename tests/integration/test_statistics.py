@@ -1206,3 +1206,68 @@ def test_detect_outliers_performance(numeric_types_fixture, file_loader):
     assert response.performance is not None
     assert response.performance.execution_time_ms > 0
     assert response.performance.execution_time_ms < 5000, "Should complete quickly"
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_get_column_stats_with_negation(numeric_types_fixture, file_loader):
+    """Test get_column_stats with negated filter.
+    
+    Verifies:
+    - Statistics calculated only for rows satisfying negated condition
+    - Negation works correctly in statistics context
+    """
+    print(f"\n🔍 Testing get_column_stats with negation")
+    
+    ops = StatisticsOperations(file_loader)
+    
+    request = GetColumnStatsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        column="Количество",
+        filters=[
+            FilterCondition(column="Количество", operator="<", value=100, negate=True)
+        ]
+    )
+    
+    response = ops.get_column_stats(request)
+    
+    print(f"✅ Stats with negation:")
+    print(f"   Count: {response.stats.count}")
+    print(f"   Min: {response.stats.min}, Max: {response.stats.max}")
+    
+    # Should calculate stats only for Количество >= 100
+    assert response.stats.count > 0, "Should have some rows"
+    assert response.stats.min >= 100, "Min should be >= 100 (negated < 100)"
+
+
+def test_correlate_with_negation(numeric_types_fixture, file_loader):
+    """Test correlate with negated filter.
+    
+    Verifies:
+    - Correlation calculated only for filtered rows
+    - Negation works correctly
+    """
+    print(f"\n🔍 Testing correlate with negation")
+    
+    ops = StatisticsOperations(file_loader)
+    
+    request = CorrelateRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        columns=["Количество", "Цена"],
+        method="pearson",
+        filters=[
+            FilterCondition(column="Количество", operator="<", value=50, negate=True)
+        ]
+    )
+    
+    response = ops.correlate(request)
+    
+    print(f"✅ Correlation matrix calculated with negation")
+    print(f"   Rows processed: {response.metadata.rows_total}")
+    
+    assert response.correlation_matrix is not None, "Should return correlation matrix"
+    assert len(response.correlation_matrix) > 0, "Matrix should not be empty"

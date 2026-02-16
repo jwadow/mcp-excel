@@ -22,6 +22,7 @@ class FilterCondition(BaseModel):
     ] = Field(description="Comparison operator")
     value: Optional[Any] = Field(default=None, description="Value to compare against (for single-value operators)")
     values: Optional[list[Any]] = Field(default=None, description="List of values (for 'in' and 'not_in' operators)")
+    negate: bool = Field(default=False, description="Negate the condition (NOT operator). Inverts the result. Example: {'column': 'Status', 'operator': '==', 'value': 'Active', 'negate': True} means Status != 'Active'")
 
 
 class FilterGroup(BaseModel):

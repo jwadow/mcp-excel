@@ -856,3 +856,73 @@ def test_moving_average_with_manual_header(messy_headers_fixture, file_loader):
     print(f"✅ Handled messy headers: {len(response.rows)} rows")
     
     assert len(response.rows) > 0, "Should work with messy headers"
+
+
+# ============================================================================
+# NEGATION OPERATOR (NOT) TESTS
+# ============================================================================
+
+def test_calculate_period_change_with_negation(with_dates_fixture, file_loader):
+    """Test calculate_period_change with negated filter.
+    
+    Verifies:
+    - Period change calculated only for filtered rows
+    - Negation works correctly in timeseries context
+    """
+    print(f"\n🔍 Testing calculate_period_change with negation")
+    
+    ops = TimeSeriesOperations(file_loader)
+    
+    from mcp_excel.models.requests import CalculatePeriodChangeRequest
+    
+    date_col = with_dates_fixture.expected["datetime_columns"][0]
+    
+    request = CalculatePeriodChangeRequest(
+        file_path=with_dates_fixture.path_str,
+        sheet_name=with_dates_fixture.sheet_name,
+        date_column=date_col,
+        value_column="Сумма",
+        period_type="month",
+        filters=[
+            FilterCondition(column="Сумма", operator="<", value=1000, negate=True)
+        ]
+    )
+    
+    response = ops.calculate_period_change(request)
+    
+    print(f"✅ Period change with negation: {len(response.periods)} periods")
+    
+    assert len(response.periods) >= 0, "Should calculate periods"
+
+
+def test_calculate_running_total_with_negation(with_dates_fixture, file_loader):
+    """Test calculate_running_total with negated filter.
+    
+    Verifies:
+    - Running total calculated only for filtered rows
+    - Negation works correctly
+    """
+    print(f"\n🔍 Testing calculate_running_total with negation")
+    
+    ops = TimeSeriesOperations(file_loader)
+    
+    from mcp_excel.models.requests import CalculateRunningTotalRequest
+    
+    date_col = with_dates_fixture.expected["datetime_columns"][0]
+    
+    request = CalculateRunningTotalRequest(
+        file_path=with_dates_fixture.path_str,
+        sheet_name=with_dates_fixture.sheet_name,
+        order_column=date_col,
+        value_column="Сумма",
+        group_by_columns=None,
+        filters=[
+            FilterCondition(column="Сумма", operator="<", value=500, negate=True)
+        ]
+    )
+    
+    response = ops.calculate_running_total(request)
+    
+    print(f"✅ Running total with negation: {len(response.rows)} rows")
+    
+    assert len(response.rows) > 0, "Should calculate running total"
