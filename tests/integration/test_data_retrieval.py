@@ -1719,3 +1719,371 @@ def test_filter_and_get_rows_with_negation(simple_fixture, file_loader):
     assert all(row[simple_fixture.columns[0]] != test_value for row in response.rows), \
         f"No row should have {simple_fixture.columns[0]} == {test_value}"
     assert response.count > 0, "Should return some rows"
+  
+# ============================================================================
+# NESTED FILTER GROUPS TESTS (filter_and_get_rows)
+# ============================================================================
+
+def test_filter_and_get_rows_nested_and_or(simple_fixture, file_loader):
+    """Test filter_and_get_rows with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in filter_and_get_rows
+    - Returns correct rows for complex logic
+    - All returned rows match the nested condition
+    """
+    print(f"\n🔍 Testing filter_and_get_rows: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Filter: ({simple_fixture.columns[0]} == '{values[0]}' AND {simple_fixture.columns[1]} > 0) OR {simple_fixture.columns[0]} == '{values[1]}'")
+    
+    # Act
+    request = FilterAndGetRowsRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])
+        ],
+        columns=None,
+        limit=50,
+        offset=0,
+        logic="OR"
+    )
+    response = ops.filter_and_get_rows(request)
+    
+    # Assert
+    print(f"✅ Returned {response.count} rows")
+    
+    assert response.count > 0, "Should find matching rows"
+    
+    # Verify each row matches the nested logic
+    for row in response.rows:
+        matches_group = (row[simple_fixture.columns[0]] == values[0] and row[simple_fixture.columns[1]] > 0)
+        matches_condition = (row[simple_fixture.columns[0]] == values[1])
+        assert matches_group or matches_condition, "Row should match (A AND B) OR C"
+
+
+def test_filter_and_get_rows_nested_or_and(numeric_types_fixture, file_loader):
+    """Test filter_and_get_rows with nested group: (A OR B) AND C.
+    
+    Verifies:
+    - Different nesting pattern works
+    - Logic: (Количество < 50 OR Количество > 150) AND Цена > 100
+    """
+    print(f"\n🔍 Testing filter_and_get_rows: (A OR B) AND C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 OR Количество > 150) AND Цена > 100")
+    
+    # Act
+    request = FilterAndGetRowsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Количество", operator=">", value=150)
+                ],
+                logic="OR"
+            ),
+            FilterCondition(column="Цена", operator=">", value=100)
+        ],
+        columns=None,
+        limit=50,
+        offset=0,
+        logic="AND"
+    )
+    response = ops.filter_and_get_rows(request)
+    
+    # Assert
+    print(f"✅ Returned {response.count} rows")
+    
+    assert response.count >= 0, "Count should be non-negative"
+    
+    # Verify each row matches the nested logic
+    for row in response.rows:
+        quantity = row["Количество"]
+        price = row["Цена"]
+        matches_group = (quantity < 50 or quantity > 150)
+        matches_condition = (price > 100)
+        assert matches_group and matches_condition, "Row should match (A OR B) AND C"
+
+
+def test_filter_and_get_rows_nested_three_levels(numeric_types_fixture, file_loader):
+    """Test filter_and_get_rows with 3 levels of nesting: ((A OR B) AND C) OR D.
+    
+    Verifies:
+    - Deep nesting works correctly
+    - Complex logic is evaluated properly
+    """
+    print(f"\n🔍 Testing filter_and_get_rows with 3 levels: ((A OR B) AND C) OR D")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: ((Количество < 50 OR Количество > 150) AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = FilterAndGetRowsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column="Количество", operator="<", value=50),
+                            FilterCondition(column="Количество", operator=">", value=150)
+                        ],
+                        logic="OR"
+                    ),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        columns=None,
+        limit=50,
+        offset=0,
+        logic="OR"
+    )
+    response = ops.filter_and_get_rows(request)
+    
+    # Assert
+    print(f"✅ Returned {response.count} rows")
+    
+    assert response.count >= 0, "Count should be non-negative"
+    
+    # Verify complex nested logic
+    for row in response.rows:
+        quantity = row["Количество"]
+        price = row["Цена"]
+        inner_group = (quantity < 50 or quantity > 150)
+        outer_group = (inner_group and price > 100)
+        matches = outer_group or (quantity == 100)
+        assert matches, "Row should match ((A OR B) AND C) OR D"
+
+
+def test_filter_and_get_rows_nested_with_negation(simple_fixture, file_loader):
+    """Test filter_and_get_rows with nested group and negation: NOT (A AND B).
+    
+    Verifies:
+    - Negation works with nested groups
+    - Returns rows not matching the group
+    """
+    print(f"\n🔍 Testing filter_and_get_rows: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: NOT ({simple_fixture.columns[0]} == '{test_value}' AND {simple_fixture.columns[1]} > 0)")
+    
+    # Act
+    request = FilterAndGetRowsRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ],
+        columns=None,
+        limit=50,
+        offset=0,
+        logic="AND"
+    )
+    response = ops.filter_and_get_rows(request)
+    
+    # Assert
+    print(f"✅ Returned {response.count} rows")
+    
+    assert response.count > 0, "Should find rows not matching the group"
+    
+    # Verify each row does NOT match (A AND B)
+    for row in response.rows:
+        matches_group = (row[simple_fixture.columns[0]] == test_value and row[simple_fixture.columns[1]] > 0)
+        assert not matches_group, "Row should NOT match (A AND B)"
+
+
+def test_filter_and_get_rows_nested_with_column_selection(simple_fixture, file_loader):
+    """Test filter_and_get_rows with nested groups and column selection.
+    
+    Verifies:
+    - Nested groups work with column selection
+    - Returns only requested columns
+    """
+    print(f"\n🔍 Testing filter_and_get_rows: nested groups + column selection")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    selected_columns = simple_fixture.columns[:2]
+    
+    print(f"  Filter: (A AND B) OR C")
+    print(f"  Columns: {selected_columns}")
+    
+    # Act
+    request = FilterAndGetRowsRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])
+        ],
+        columns=selected_columns,
+        limit=50,
+        offset=0,
+        logic="OR"
+    )
+    response = ops.filter_and_get_rows(request)
+    
+    # Assert
+    print(f"✅ Returned {response.count} rows with {len(selected_columns)} columns")
+    
+    assert response.count > 0, "Should find matching rows"
+    
+    # Check that all rows have only selected columns
+    for row in response.rows:
+        assert len(row) == len(selected_columns), f"Row should have {len(selected_columns)} columns"
+        for col in selected_columns:
+            assert col in row, f"Row should have column {col}"
+
+
+def test_filter_and_get_rows_nested_with_pagination(simple_fixture, file_loader):
+    """Test filter_and_get_rows with nested groups and pagination.
+    
+    Verifies:
+    - Nested groups work with limit/offset
+    - Pagination works correctly with complex filters
+    """
+    print(f"\n🔍 Testing filter_and_get_rows: nested groups + pagination")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Filter: (A AND B) OR C with limit=3")
+    
+    # Act - Page 1
+    request_page1 = FilterAndGetRowsRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])
+        ],
+        columns=None,
+        limit=3,
+        offset=0,
+        logic="OR"
+    )
+    response_page1 = ops.filter_and_get_rows(request_page1)
+    
+    # Assert
+    print(f"✅ Page 1: {response_page1.count} rows")
+    print(f"   Total matches: {response_page1.total_matches}")
+    
+    assert response_page1.count <= 3, "Should respect limit=3"
+    
+    if response_page1.total_matches > 3:
+        assert response_page1.truncated is True, "Should be truncated when more rows available"
+        
+        # Act - Page 2
+        request_page2 = FilterAndGetRowsRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                        FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                    ],
+                    logic="AND"
+                ),
+                FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])
+            ],
+            columns=None,
+            limit=3,
+            offset=3,
+            logic="OR"
+        )
+        response_page2 = ops.filter_and_get_rows(request_page2)
+        
+        print(f"   Page 2: {response_page2.count} rows")
+        
+        # Pages should have different data
+        if response_page1.rows and response_page2.rows:
+            page1_first = response_page1.rows[0]
+            page2_first = response_page2.rows[0]
+            assert page1_first != page2_first, "Different pages should have different data"

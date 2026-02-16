@@ -12,7 +12,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..models.requests import FilterCondition
+from ..models.requests import FilterCondition, FilterGroup
 from ..core.datetime_converter import DateTimeConverter
 
 
@@ -27,16 +27,17 @@ class FilterEngine:
         """Normalize column name for robust matching.
         
         Handles:
+        - Non-string column names (pandas can use integers: 0, 1, 2...)
         - Unicode normalization (NFC - composed form)
         - Non-breaking spaces (U+00A0) → regular spaces (U+0020)
         - Leading/trailing whitespace
         - Multiple consecutive spaces → single space
         
         Args:
-            name: Column name to normalize
+            name: Column name to normalize (accepts str or int)
         
         Returns:
-            Normalized column name
+            Normalized column name (always str)
         
         Examples:
             >>> _normalize_column_name("café")  # NFC or NFD
@@ -45,7 +46,15 @@ class FilterEngine:
             "Нетто, кг"  # Regular space
             >>> _normalize_column_name("  Name  ")
             "Name"
+            >>> _normalize_column_name(0)  # Integer column name
+            "0"
         """
+        # 0. Handle non-string column names (defensive programming)
+        # Pandas can use integers (0, 1, 2...) when headers are not detected
+        # This makes FilterEngine robust for direct usage (e.g., in tests)
+        if not isinstance(name, str):
+            name = str(name)
+        
         # 1. Unicode normalization (NFC - composed form)
         # This ensures "café" (NFC) and "café" (NFD) are treated as identical
         name = unicodedata.normalize('NFC', name)
@@ -66,14 +75,14 @@ class FilterEngine:
     def apply_filters(
         self,
         df: pd.DataFrame,
-        filters: list[FilterCondition],
+        filters: list[FilterCondition | FilterGroup],
         logic: str = "AND",
     ) -> pd.DataFrame:
-        """Apply filters to DataFrame.
+        """Apply filters to DataFrame with support for nested groups.
 
         Args:
             df: DataFrame to filter
-            filters: List of filter conditions
+            filters: List of filter conditions or nested groups
             logic: Logic operator ("AND" or "OR")
 
         Returns:
@@ -86,10 +95,18 @@ class FilterEngine:
         if not filters:
             return df
 
-        # Build mask for each filter
+        # Build mask for each filter (may be condition or group)
         masks = []
-        for filter_cond in filters:
-            mask = self._build_filter_mask(df, filter_cond)
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Atomic condition
+                mask = self._build_filter_mask(df, filter_item)
+            elif isinstance(filter_item, FilterGroup):
+                # Nested group - RECURSION
+                mask = self._build_group_mask(df, filter_item)
+            else:
+                raise ValueError(f"Invalid filter type: {type(filter_item)}")
+            
             masks.append(mask)
 
         # Combine masks with logic operator
@@ -110,14 +127,14 @@ class FilterEngine:
     def count_filtered(
         self,
         df: pd.DataFrame,
-        filters: list[FilterCondition],
+        filters: list[FilterCondition | FilterGroup],
         logic: str = "AND",
     ) -> int:
         """Count rows matching filters without materializing DataFrame.
 
         Args:
             df: DataFrame to filter
-            filters: List of filter conditions
+            filters: List of filter conditions or nested groups
             logic: Logic operator ("AND" or "OR")
 
         Returns:
@@ -127,8 +144,16 @@ class FilterEngine:
             return len(df)
 
         masks = []
-        for filter_cond in filters:
-            mask = self._build_filter_mask(df, filter_cond)
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Atomic condition
+                mask = self._build_filter_mask(df, filter_item)
+            elif isinstance(filter_item, FilterGroup):
+                # Nested group - RECURSION
+                mask = self._build_group_mask(df, filter_item)
+            else:
+                raise ValueError(f"Invalid filter type: {type(filter_item)}")
+            
             masks.append(mask)
 
         if logic == "AND":
@@ -141,6 +166,64 @@ class FilterEngine:
                 combined_mask = combined_mask | mask
 
         return int(combined_mask.sum())
+
+    def _build_group_mask(
+        self,
+        df: pd.DataFrame,
+        group: FilterGroup
+    ) -> pd.Series:
+        """Build boolean mask for a filter group (recursive).
+        
+        Supports nested groups for complex logical expressions like:
+        - (A AND B) OR C
+        - A AND (B OR C)
+        - ((A OR B) AND C) OR D
+        
+        Args:
+            df: DataFrame to filter
+            group: Filter group with nested conditions
+        
+        Returns:
+            Boolean Series mask
+        
+        Raises:
+            ValueError: If filter is invalid
+        """
+        if not group.filters:
+            # Empty group - return all True mask
+            return pd.Series([True] * len(df), index=df.index)
+        
+        # Recursively build masks for each filter in the group
+        masks = []
+        for filter_item in group.filters:
+            if isinstance(filter_item, FilterCondition):
+                # Atomic condition
+                mask = self._build_filter_mask(df, filter_item)
+            elif isinstance(filter_item, FilterGroup):
+                # Nested group - RECURSION
+                mask = self._build_group_mask(df, filter_item)
+            else:
+                raise ValueError(f"Invalid filter type: {type(filter_item)}")
+            
+            masks.append(mask)
+        
+        # Combine masks with group's logic operator
+        if group.logic == "AND":
+            combined_mask = masks[0]
+            for mask in masks[1:]:
+                combined_mask = combined_mask & mask
+        elif group.logic == "OR":
+            combined_mask = masks[0]
+            for mask in masks[1:]:
+                combined_mask = combined_mask | mask
+        else:
+            raise ValueError(f"Invalid logic operator: {group.logic}")
+        
+        # Apply negation to entire group if requested (NOT operator)
+        if group.negate:
+            combined_mask = ~combined_mask
+        
+        return combined_mask
 
     def _build_filter_mask(
         self, df: pd.DataFrame, filter_cond: FilterCondition
@@ -176,7 +259,7 @@ class FilterEngine:
                 cutoff=0.6
             )
             
-            available = ", ".join(df.columns.tolist())
+            available = ", ".join(str(col) for col in df.columns)
             suggestion_text = ""
             if suggestions:
                 # Map back to original names for suggestions
@@ -269,75 +352,104 @@ class FilterEngine:
         return mask
 
     def validate_filters(
-        self, df: pd.DataFrame, filters: list[FilterCondition]
+        self, df: pd.DataFrame, filters: list[FilterCondition | FilterGroup]
     ) -> tuple[bool, str | None]:
-        """Validate filters against DataFrame.
+        """Validate filters against DataFrame (recursive).
 
         Args:
             df: DataFrame to validate against
-            filters: List of filter conditions
+            filters: List of filter conditions or nested groups
 
         Returns:
             Tuple of (is_valid, error_message)
         """
-        # Build normalized column mapping once for all filters
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Validate atomic condition
+                result = self._validate_condition(df, filter_item)
+                if not result[0]:
+                    return result
+            elif isinstance(filter_item, FilterGroup):
+                # Validate nested group - RECURSION
+                result = self.validate_filters(df, filter_item.filters)
+                if not result[0]:
+                    return result
+            else:
+                return (False, f"Invalid filter type: {type(filter_item)}")
+        
+        return (True, None)
+    
+    def _validate_condition(
+        self,
+        df: pd.DataFrame,
+        filter_cond: FilterCondition
+    ) -> tuple[bool, str | None]:
+        """Validate single filter condition.
+        
+        Args:
+            df: DataFrame to validate against
+            filter_cond: Filter condition to validate
+        
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        # Build normalized column mapping once
         normalized_to_original = {
             self._normalize_column_name(col): col
             for col in df.columns
         }
         
-        for filter_cond in filters:
-            # Check column exists using normalized comparison
-            filter_col_normalized = self._normalize_column_name(filter_cond.column)
+        # Check column exists using normalized comparison
+        filter_col_normalized = self._normalize_column_name(filter_cond.column)
+        
+        if filter_col_normalized not in normalized_to_original:
+            # Column not found - provide helpful error with fuzzy matching
+            suggestions = get_close_matches(
+                filter_col_normalized,
+                normalized_to_original.keys(),
+                n=3,
+                cutoff=0.6
+            )
             
-            if filter_col_normalized not in normalized_to_original:
-                # Column not found - provide helpful error with fuzzy matching
-                suggestions = get_close_matches(
-                    filter_col_normalized,
-                    normalized_to_original.keys(),
-                    n=3,
-                    cutoff=0.6
-                )
-                
-                available = ", ".join(df.columns.tolist())
-                suggestion_text = ""
-                if suggestions:
-                    # Map back to original names for suggestions
-                    original_suggestions = [
-                        normalized_to_original[s] for s in suggestions
-                    ]
-                    suggestion_text = f" Did you mean: {', '.join(repr(s) for s in original_suggestions)}?"
-                
-                return (
-                    False,
-                    f"Column '{filter_cond.column}' not found.{suggestion_text} Available: {available}",
-                )
+            available = ", ".join(str(col) for col in df.columns)
+            suggestion_text = ""
+            if suggestions:
+                # Map back to original names for suggestions
+                original_suggestions = [
+                    normalized_to_original[s] for s in suggestions
+                ]
+                suggestion_text = f" Did you mean: {', '.join(repr(s) for s in original_suggestions)}?"
+            
+            return (
+                False,
+                f"Column '{filter_cond.column}' not found.{suggestion_text} Available: {available}",
+            )
 
-            # Check operator-specific requirements
-            if filter_cond.operator in ["in", "not_in"]:
-                if not filter_cond.values:
-                    return (False, f"Operator '{filter_cond.operator}' requires 'values' parameter")
+        # Check operator-specific requirements
+        if filter_cond.operator in ["in", "not_in"]:
+            if not filter_cond.values:
+                return (False, f"Operator '{filter_cond.operator}' requires 'values' parameter")
 
-            elif filter_cond.operator in ["contains", "startswith", "endswith", "regex"]:
-                if not isinstance(filter_cond.value, str):
-                    return (False, f"Operator '{filter_cond.operator}' requires string value")
+        elif filter_cond.operator in ["contains", "startswith", "endswith", "regex"]:
+            if not isinstance(filter_cond.value, str):
+                return (False, f"Operator '{filter_cond.operator}' requires string value")
 
-            elif filter_cond.operator in ["is_null", "is_not_null"]:
-                # These don't need value
-                pass
+        elif filter_cond.operator in ["is_null", "is_not_null"]:
+            # These don't need value
+            pass
 
-            else:
-                # Comparison operators need value
-                if filter_cond.value is None:
-                    return (False, f"Operator '{filter_cond.operator}' requires 'value' parameter")
+        else:
+            # Comparison operators need value
+            if filter_cond.value is None:
+                return (False, f"Operator '{filter_cond.operator}' requires 'value' parameter")
 
         return (True, None)
 
-    def get_filter_summary(self, filters: list[FilterCondition], logic: str) -> str:
-        """Get human-readable summary of filters.
+    def get_filter_summary(self, filters: list[FilterCondition | FilterGroup], logic: str) -> str:
+        """Get human-readable summary of filters (recursive).
 
         Args:
-            filters: List of filter conditions
+            filters: List of filter conditions or nested groups
             logic: Logic operator
 
         Returns:
@@ -347,20 +459,33 @@ class FilterEngine:
             return "No filters applied"
 
         parts = []
-        for f in filters:
-            if f.operator in ["in", "not_in"]:
-                value_str = f", ".join(str(v) for v in (f.values or []))
-                condition = f"{f.column} {f.operator} [{value_str}]"
-            elif f.operator in ["is_null", "is_not_null"]:
-                condition = f"{f.column} {f.operator}"
-            else:
-                condition = f"{f.column} {f.operator} {f.value}"
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Format atomic condition
+                if filter_item.operator in ["in", "not_in"]:
+                    value_str = ", ".join(str(v) for v in (filter_item.values or []))
+                    condition = f"{filter_item.column} {filter_item.operator} [{value_str}]"
+                elif filter_item.operator in ["is_null", "is_not_null"]:
+                    condition = f"{filter_item.column} {filter_item.operator}"
+                else:
+                    condition = f"{filter_item.column} {filter_item.operator} {filter_item.value}"
+                
+                # Apply negation if requested
+                if filter_item.negate:
+                    condition = f"NOT ({condition})"
+                
+                parts.append(condition)
             
-            # Apply negation if requested
-            if f.negate:
-                condition = f"NOT ({condition})"
-            
-            parts.append(condition)
+            elif isinstance(filter_item, FilterGroup):
+                # Format nested group - RECURSION
+                group_summary = self.get_filter_summary(filter_item.filters, filter_item.logic)
+                group_str = f"({group_summary})"
+                
+                # Apply negation to entire group if requested
+                if filter_item.negate:
+                    group_str = f"NOT {group_str}"
+                
+                parts.append(group_str)
 
         return f" {logic} ".join(parts)
     

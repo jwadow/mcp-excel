@@ -147,16 +147,17 @@ class BaseOperations:
         """Normalize column name for robust matching.
         
         Handles:
+        - Non-string column names (pandas can use integers: 0, 1, 2...)
         - Unicode normalization (NFC - composed form)
         - Non-breaking spaces (U+00A0) → regular spaces (U+0020)
         - Leading/trailing whitespace
         - Multiple consecutive spaces → single space
         
         Args:
-            name: Column name to normalize
+            name: Column name to normalize (accepts str or int)
         
         Returns:
-            Normalized column name
+            Normalized column name (always str)
         
         Examples:
             >>> _normalize_column_name("café")  # NFC or NFD
@@ -165,7 +166,15 @@ class BaseOperations:
             "Нетто, кг"  # Regular space
             >>> _normalize_column_name("  Name  ")
             "Name"
+            >>> _normalize_column_name(0)  # Integer column name
+            "0"
         """
+        # 0. Handle non-string column names (defensive programming)
+        # Pandas can use integers (0, 1, 2...) when headers are not detected
+        # This makes BaseOperations robust for all usage scenarios
+        if not isinstance(name, str):
+            name = str(name)
+        
         # 1. Unicode normalization (NFC - composed form)
         # This ensures "café" (NFC) and "café" (NFD) are treated as identical
         name = unicodedata.normalize('NFC', name)
@@ -234,7 +243,7 @@ class BaseOperations:
             cutoff=0.6
         )
         
-        available = ", ".join(df.columns.tolist())
+        available = ", ".join(str(col) for col in df.columns)
         suggestion_text = ""
         if suggestions:
             # Map back to original names for suggestions

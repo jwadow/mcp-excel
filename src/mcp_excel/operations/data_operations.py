@@ -20,6 +20,8 @@ from ..models.requests import (
     GetUniqueValuesRequest,
     GetValueCountsRequest,
     GroupByRequest,
+    FilterCondition,
+    FilterGroup,
 )
 from ..models.responses import (
     AggregateResponse,
@@ -75,6 +77,80 @@ class DataOperations(BaseOperations):
                 column_types[col_str] = "string"
         
         return column_types
+    
+    def _serialize_filters(self, filters: list[FilterCondition | FilterGroup]) -> list[dict]:
+        """Serialize filters for response (recursive).
+        
+        Handles both FilterCondition and FilterGroup (nested).
+        
+        Args:
+            filters: List of filter conditions or groups
+            
+        Returns:
+            List of serialized filter dictionaries
+        """
+        result = []
+        
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Atomic condition
+                result.append({
+                    "column": filter_item.column,
+                    "operator": filter_item.operator,
+                    "value": filter_item.value,
+                    "values": filter_item.values,
+                    "negate": filter_item.negate
+                })
+            elif isinstance(filter_item, FilterGroup):
+                # Nested group - RECURSION
+                result.append({
+                    "type": "group",
+                    "filters": self._serialize_filters(filter_item.filters),
+                    "logic": filter_item.logic,
+                    "negate": filter_item.negate
+                })
+            else:
+                raise ValueError(f"Unknown filter type: {type(filter_item)}")
+        
+        return result
+    
+    def _build_column_ranges_from_filters(
+        self,
+        filters: list[FilterCondition | FilterGroup],
+        formula_gen,
+        column_indices: dict[str, int]
+    ) -> dict[str, str]:
+        """Build column ranges from filters (recursive).
+        
+        Extracts all columns used in filters (including nested groups)
+        and builds Excel ranges for them.
+        
+        Args:
+            filters: List of filter conditions or groups
+            formula_gen: FormulaGenerator instance
+            column_indices: Mapping of column names to indices
+            
+        Returns:
+            Dictionary mapping column names to Excel ranges
+        """
+        column_ranges = {}
+        
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Atomic condition - add its column
+                col_idx = column_indices.get(filter_item.column)
+                if col_idx is not None:
+                    column_ranges[filter_item.column] = formula_gen._get_column_range(
+                        filter_item.column, col_idx
+                    )
+            elif isinstance(filter_item, FilterGroup):
+                # Nested group - RECURSION
+                nested_ranges = self._build_column_ranges_from_filters(
+                    filter_item.filters, formula_gen, column_indices
+                )
+                column_ranges.update(nested_ranges)
+        
+        return column_ranges
 
     def get_unique_values(
         self, request: GetUniqueValuesRequest
@@ -207,13 +283,9 @@ class DataOperations(BaseOperations):
         
         # Build column ranges for formula generation
         column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
-        column_ranges = {}
-        for filter_cond in request.filters:
-            col_idx = column_indices.get(filter_cond.column)
-            if col_idx is not None:
-                column_ranges[filter_cond.column] = formula_gen._get_column_range(
-                    filter_cond.column, col_idx
-                )
+        column_ranges = self._build_column_ranges_from_filters(
+            request.filters, formula_gen, column_indices
+        )
 
         # Generate formula (returns None if filters use operators not supported in Excel)
         formula = formula_gen.generate_from_filter(
@@ -238,15 +310,7 @@ class DataOperations(BaseOperations):
         )
 
         # Serialize filters for response
-        filters_applied = [
-            {
-                "column": f.column,
-                "operator": f.operator,
-                "value": f.value,
-                "values": f.values,
-            }
-            for f in request.filters
-        ]
+        filters_applied = self._serialize_filters(request.filters)
 
         metadata = self._get_file_metadata(request.file_path, request.sheet_name)
         metadata.rows_total = len(df)
@@ -430,12 +494,9 @@ class DataOperations(BaseOperations):
         # Build column ranges
         column_ranges = {}
         if request.filters:
-            for filter_cond in request.filters:
-                col_idx = column_indices.get(filter_cond.column)
-                if col_idx is not None:
-                    column_ranges[filter_cond.column] = formula_gen._get_column_range(
-                        filter_cond.column, col_idx
-                    )
+            column_ranges = self._build_column_ranges_from_filters(
+                request.filters, formula_gen, column_indices
+            )
 
         # Get target column range
         target_col_idx = column_indices.get(request.target_column)
@@ -469,15 +530,7 @@ class DataOperations(BaseOperations):
         )
 
         # Serialize filters for response
-        filters_applied = [
-            {
-                "column": f.column,
-                "operator": f.operator,
-                "value": f.value,
-                "values": f.values,
-            }
-            for f in request.filters
-        ]
+        filters_applied = self._serialize_filters(request.filters)
 
         metadata = self._get_file_metadata(request.file_path, request.sheet_name)
         metadata.rows_total = len(df)
@@ -642,28 +695,16 @@ class DataOperations(BaseOperations):
             )
 
             # Serialize filters for response
-            filters_applied = [
-                {
-                    "column": f.column,
-                    "operator": f.operator,
-                    "value": f.value,
-                    "values": f.values,
-                }
-                for f in filter_set.filters
-            ]
+            filters_applied = self._serialize_filters(filter_set.filters)
 
             # Generate Excel formula
             formula_gen = FormulaGenerator(request.sheet_name)
             column_types = self._get_column_types(df)
             column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
 
-            column_ranges = {}
-            for filter_cond in filter_set.filters:
-                col_idx = column_indices.get(filter_cond.column)
-                if col_idx is not None:
-                    column_ranges[filter_cond.column] = formula_gen._get_column_range(
-                        filter_cond.column, col_idx
-                    )
+            column_ranges = self._build_column_ranges_from_filters(
+                filter_set.filters, formula_gen, column_indices
+            )
 
             formula = formula_gen.generate_from_filter(
                 operation="count",

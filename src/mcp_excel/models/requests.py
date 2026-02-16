@@ -26,10 +26,17 @@ class FilterCondition(BaseModel):
 
 
 class FilterGroup(BaseModel):
-    """Group of filter conditions with logic operator."""
+    """Group of filter conditions with logic operator.
+    
+    Supports nested groups for complex logical expressions like:
+    - (A AND B) OR C
+    - A AND (B OR C)
+    - ((A OR B) AND C) OR D
+    """
 
     filters: list[Union[FilterCondition, "FilterGroup"]] = Field(description="List of filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for combining filters")
+    negate: bool = Field(default=False, description="Negate the entire group (NOT operator). Inverts the result of all filters in this group.")
 
 
 class InspectFileRequest(BaseModel):
@@ -87,7 +94,7 @@ class FilterAndCountRequest(BaseModel):
 
     file_path: str = Field(description="Absolute path to the Excel file")
     sheet_name: str = Field(description="Name of the sheet")
-    filters: list[FilterCondition] = Field(description="List of filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(description="List of filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for combining filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -97,7 +104,7 @@ class FilterAndGetRowsRequest(BaseModel):
 
     file_path: str = Field(description="Absolute path to the Excel file")
     sheet_name: str = Field(description="Name of the sheet")
-    filters: list[FilterCondition] = Field(description="List of filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(description="List of filter conditions or nested groups")
     columns: Optional[list[str]] = Field(default=None, description="Columns to return (None = all columns)")
     limit: int = Field(default=50, description="Maximum number of rows to return")
     offset: int = Field(default=0, description="Number of rows to skip")
@@ -114,7 +121,7 @@ class AggregateRequest(BaseModel):
         description="Aggregation operation"
     )
     target_column: str = Field(description="Column to aggregate")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -129,7 +136,7 @@ class GroupByRequest(BaseModel):
     agg_operation: Literal["sum", "mean", "median", "min", "max", "std", "var", "count"] = Field(
         description="Aggregation operation"
     )
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -141,7 +148,7 @@ class CorrelateRequest(BaseModel):
     sheet_name: str = Field(description="Name of the sheet")
     columns: list[str] = Field(description="Columns to correlate (minimum 2)")
     method: Literal["pearson", "spearman", "kendall"] = Field(default="pearson", description="Correlation method")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -152,7 +159,7 @@ class GetColumnStatsRequest(BaseModel):
     file_path: str = Field(description="Absolute path to the Excel file")
     sheet_name: str = Field(description="Name of the sheet")
     column: str = Field(description="Column name")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -213,7 +220,7 @@ class CalculatePeriodChangeRequest(BaseModel):
     date_column: str = Field(description="Column containing dates")
     value_column: str = Field(description="Column containing values to analyze")
     period_type: Literal["month", "quarter", "year"] = Field(description="Period type for grouping")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -226,7 +233,7 @@ class CalculateRunningTotalRequest(BaseModel):
     order_column: str = Field(description="Column to order by (typically date)")
     value_column: str = Field(description="Column containing values to sum")
     group_by_columns: Optional[list[str]] = Field(default=None, description="Optional columns to group by")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -239,7 +246,7 @@ class CalculateMovingAverageRequest(BaseModel):
     order_column: str = Field(description="Column to order by (typically date)")
     value_column: str = Field(description="Column containing values to average")
     window_size: int = Field(description="Number of periods for moving average window")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -253,7 +260,7 @@ class RankRowsRequest(BaseModel):
     direction: Literal["asc", "desc"] = Field(default="desc", description="Ranking direction (desc = highest first)")
     top_n: Optional[int] = Field(default=None, description="Return only top N rows (None = all rows)")
     group_by_columns: Optional[list[str]] = Field(default=None, description="Optional columns to group by for ranking within groups")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -265,7 +272,7 @@ class CalculateExpressionRequest(BaseModel):
     sheet_name: str = Field(description="Name of the sheet")
     expression: str = Field(description="Expression to calculate (e.g., 'Price * Quantity')")
     output_column_name: str = Field(description="Name for the calculated column")
-    filters: list[FilterCondition] = Field(default_factory=list, description="Optional filter conditions")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
@@ -274,7 +281,7 @@ class FilterSet(BaseModel):
     """Single set of filters with optional label."""
 
     label: Optional[str] = Field(default=None, description="Optional label for this filter set")
-    filters: list[FilterCondition] = Field(description="List of filter conditions for this set")
+    filters: list[Union[FilterCondition, FilterGroup]] = Field(description="List of filter conditions or nested groups for this set")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for combining filters in this set")
 
 

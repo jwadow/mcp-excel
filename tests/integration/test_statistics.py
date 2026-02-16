@@ -1271,3 +1271,135 @@ def test_correlate_with_negation(numeric_types_fixture, file_loader):
     
     assert response.correlation_matrix is not None, "Should return correlation matrix"
     assert len(response.correlation_matrix) > 0, "Matrix should not be empty"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS TESTS (statistics)
+# ============================================================================
+
+def test_get_column_stats_nested_filters(numeric_types_fixture, file_loader):
+    """Test get_column_stats with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in get_column_stats
+    - Stats calculated only for filtered rows
+    - Formula is None (nested groups not supported in Excel)
+    """
+    print(f"\n🔍 Testing get_column_stats: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = StatisticsOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = GetColumnStatsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        column="Цена",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.get_column_stats(request)
+    
+    # Assert
+    print(f"✅ Stats calculated:")
+    print(f"   Count: {response.stats.count}")
+    print(f"   Min: {response.stats.min}, Max: {response.stats.max}")
+    
+    assert response.stats.count > 0, "Should have some rows"
+    assert response.stats.min is not None, "Should have min value"
+    assert response.stats.max is not None, "Should have max value"
+
+
+def test_correlate_nested_filters(numeric_types_fixture, file_loader):
+    """Test correlate with nested group: (A OR B) AND C.
+    
+    Verifies:
+    - Nested groups work in correlate
+    - Correlation calculated only for filtered rows
+    """
+    print(f"\n🔍 Testing correlate: (A OR B) AND C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = StatisticsOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 OR Количество > 150) AND Цена > 100")
+    
+    # Act
+    request = CorrelateRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        columns=["Количество", "Цена"],
+        method="pearson",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Количество", operator=">", value=150)
+                ],
+                logic="OR"
+            ),
+            FilterCondition(column="Цена", operator=">", value=100)
+        ],
+        logic="AND"
+    )
+    response = ops.correlate(request)
+    
+    # Assert
+    print(f"✅ Correlation matrix calculated")
+    print(f"   Rows processed: {response.metadata.rows_total}")
+    
+    assert response.correlation_matrix is not None, "Should return correlation matrix"
+    assert len(response.correlation_matrix) > 0, "Matrix should not be empty"
+
+
+def test_get_column_stats_nested_with_negation(numeric_types_fixture, file_loader):
+    """Test get_column_stats with nested group and negation: NOT (A AND B).
+    
+    Verifies:
+    - Negation works with nested groups in get_column_stats
+    - Stats calculated for rows not matching the group
+    """
+    print(f"\n🔍 Testing get_column_stats: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = StatisticsOperations(file_loader)
+    
+    print(f"  Filter: NOT (Количество < 50 AND Цена > 100)")
+    
+    # Act
+    request = GetColumnStatsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        column="Количество",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ]
+    )
+    response = ops.get_column_stats(request)
+    
+    # Assert
+    print(f"✅ Stats with negated group:")
+    print(f"   Count: {response.stats.count}")
+    
+    assert response.stats.count > 0, "Should have rows not matching the group"

@@ -73,7 +73,7 @@ class ValidationOperations(BaseOperations):
         # Generate TSV output
         if duplicates:
             # Include all columns plus row index
-            headers = ["_row_index"] + df.columns.tolist()
+            headers = ["_row_index"] + [str(col) for col in df.columns]
             rows = []
 
             for dup in duplicates:

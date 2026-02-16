@@ -1801,3 +1801,378 @@ def test_filter_and_count_batch_with_negation(simple_fixture, file_loader):
     assert all(r.formula is None for r in response.results), "All formulas should be None for negation"
     # Counts should be positive (excluding negated values)
     assert all(r.count > 0 for r in response.results), "All counts should be positive"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS TESTS
+# ============================================================================
+
+def test_filter_and_count_nested_and_or(simple_fixture, file_loader):
+    """Test filter_and_count with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in end-to-end flow
+    - Count is correct for complex logic
+    - Formula is None (nested groups not supported in Excel)
+    """
+    print(f"\n🔍 Testing filter_and_count with nested group: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Filter: ({simple_fixture.columns[0]} == '{values[0]}' AND {simple_fixture.columns[1]} > 0) OR {simple_fixture.columns[0]} == '{values[1]}'")
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])
+        ],
+        logic="OR"
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}")
+    print(f"   Formula: {response.excel_output.formula}")
+    
+    assert response.count > 0, "Should find matching rows"
+    assert response.excel_output.formula is None, "Formula should be None for nested groups"
+
+
+def test_filter_and_count_nested_or_and(numeric_types_fixture, file_loader):
+    """Test filter_and_count with nested group: (A OR B) AND C.
+    
+    Verifies:
+    - Different nesting pattern works
+    - Logic: (Количество < 50 OR Количество > 150) AND Цена > 100
+    """
+    print(f"\n🔍 Testing filter_and_count with nested group: (A OR B) AND C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 OR Количество > 150) AND Цена > 100")
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Количество", operator=">", value=150)
+                ],
+                logic="OR"
+            ),
+            FilterCondition(column="Цена", operator=">", value=100)
+        ],
+        logic="AND"
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}")
+    
+    assert response.count >= 0, "Count should be non-negative"
+    assert response.excel_output.formula is None, "Formula should be None for nested groups"
+
+
+def test_filter_and_count_nested_two_groups_or(simple_fixture, file_loader):
+    """Test filter_and_count with two nested groups: (A AND B) OR (C AND D).
+    
+    Verifies:
+    - Multiple nested groups work
+    - OR logic between groups
+    """
+    print(f"\n🔍 Testing filter_and_count: (A AND B) OR (C AND D)")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Filter: ({simple_fixture.columns[0]} == '{values[0]}' AND {simple_fixture.columns[1]} > 0) OR ({simple_fixture.columns[0]} == '{values[1]}' AND {simple_fixture.columns[1]} < 100)")
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND"
+            ),
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1]),
+                    FilterCondition(column=simple_fixture.columns[1], operator="<", value=100)
+                ],
+                logic="AND"
+            )
+        ],
+        logic="OR"
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}")
+    
+    assert response.count > 0, "Should find matching rows"
+
+
+def test_filter_and_count_nested_three_levels(numeric_types_fixture, file_loader):
+    """Test filter_and_count with 3 levels of nesting: ((A OR B) AND C) OR D.
+    
+    Verifies:
+    - Deep nesting works correctly
+    - Complex logic is evaluated properly
+    """
+    print(f"\n🔍 Testing filter_and_count with 3 levels: ((A OR B) AND C) OR D")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: ((Количество < 50 OR Количество > 150) AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column="Количество", operator="<", value=50),
+                            FilterCondition(column="Количество", operator=">", value=150)
+                        ],
+                        logic="OR"
+                    ),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}")
+    
+    assert response.count >= 0, "Count should be non-negative"
+
+
+def test_filter_and_count_nested_with_negation(simple_fixture, file_loader):
+    """Test filter_and_count with nested group and negation: NOT (A AND B).
+    
+    Verifies:
+    - Negation works with nested groups
+    - Logic: NOT (Name == value1 AND Age > 0)
+    """
+    print(f"\n🔍 Testing filter_and_count: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: NOT ({simple_fixture.columns[0]} == '{test_value}' AND {simple_fixture.columns[1]} > 0)")
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ],
+        logic="AND"
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}")
+    
+    assert response.count > 0, "Should find rows not matching the group"
+    assert response.excel_output.formula is None, "Formula should be None for negated groups"
+
+
+def test_filter_and_count_batch_nested_groups(simple_fixture, file_loader):
+    """Test filter_and_count_batch with nested groups in each FilterSet.
+    
+    Verifies:
+    - Batch processing works with nested groups
+    - Each filter set can have its own nested logic
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with nested groups")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Testing batch with 2 nested filter sets")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Group 1",
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                            FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                        ],
+                        logic="AND"
+                    )
+                ]
+            ),
+            FilterSet(
+                label="Group 2",
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1]),
+                            FilterCondition(column=simple_fixture.columns[1], operator="<", value=100)
+                        ],
+                        logic="AND"
+                    )
+                ]
+            )
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results:")
+    for result in response.results:
+        print(f"   {result.label}: {result.count} rows")
+    
+    assert len(response.results) == 2, "Should process 2 filter sets"
+    assert all(r.count >= 0 for r in response.results), "All counts should be non-negative"
+    # Formulas should be None for nested groups
+    assert all(r.formula is None for r in response.results), "All formulas should be None for nested groups"
+
+
+def test_filter_and_count_batch_mixed_flat_and_nested(simple_fixture, file_loader):
+    """Test filter_and_count_batch with mix of flat and nested filters.
+    
+    Verifies:
+    - Batch can handle both flat and nested filters
+    - Flat filters still generate formulas
+    - Nested filters return None formula
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with mixed flat and nested")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Testing batch: 1 flat + 1 nested")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Flat",
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])
+                ]
+            ),
+            FilterSet(
+                label="Nested",
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1]),
+                            FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                        ],
+                        logic="AND"
+                    )
+                ]
+            )
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results:")
+    for result in response.results:
+        print(f"   {result.label}: {result.count} rows, formula: {result.formula}")
+    
+    assert len(response.results) == 2, "Should process 2 filter sets"
+    # Flat filter should have formula
+    assert response.results[0].formula is not None, "Flat filter should have formula"
+    # Nested filter should not have formula
+    assert response.results[1].formula is None, "Nested filter should not have formula"

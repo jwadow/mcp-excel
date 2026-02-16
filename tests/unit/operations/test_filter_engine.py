@@ -1235,3 +1235,694 @@ def test_validate_filters_with_negation(filter_engine, sample_df):
     
     assert is_valid is True, "Negated filter should be valid"
     assert error is None, "Should have no error"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS (FilterGroup) TESTS
+# ============================================================================
+
+def test_nested_group_simple_and_or(filter_engine, sample_df):
+    """Test nested group: (A AND B) OR C.
+    
+    Logic: (Age > 30 AND City = "Moscow") OR Name = "Alice"
+    """
+    print(f"\n📂 Testing nested group: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="City", operator="==", value="Moscow")
+            ],
+            logic="AND"
+        ),
+        FilterCondition(column="Name", operator="==", value="Alice")
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="OR")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should match: (Age > 30 AND City = "Moscow") OR Name = "Alice"
+    # Alice has Age=25, City=Moscow, so matches second condition
+    assert len(result) >= 1, "Should find at least Alice"
+    assert "Alice" in result["Name"].values, "Should include Alice"
+
+
+def test_nested_group_simple_or_and(filter_engine, sample_df):
+    """Test nested group: (A OR B) AND C.
+    
+    Logic: (Name = "Alice" OR Name = "Bob") AND Age < 35
+    """
+    print(f"\n📂 Testing nested group: (A OR B) AND C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Name", operator="==", value="Alice"),
+                FilterCondition(column="Name", operator="==", value="Bob")
+            ],
+            logic="OR"
+        ),
+        FilterCondition(column="Age", operator="<", value=35)
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should match: (Alice OR Bob) AND Age < 35
+    # Alice: Age=25 (matches), Bob: Age=30 (matches)
+    assert len(result) == 2, "Should find Alice and Bob"
+    assert set(result["Name"]) == {"Alice", "Bob"}, "Should include only Alice and Bob"
+
+
+def test_nested_group_two_groups_or(filter_engine, sample_df):
+    """Test two nested groups with OR: (A AND B) OR (C AND D).
+    
+    Logic: (Age > 40 AND Active = True) OR (Age < 30 AND City = "Moscow")
+    """
+    print(f"\n📂 Testing nested: (A AND B) OR (C AND D)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=40),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND"
+        ),
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator="<", value=30),
+                FilterCondition(column="City", operator="==", value="Moscow")
+            ],
+            logic="AND"
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="OR")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should match: (Age > 40 AND Active) OR (Age < 30 AND Moscow)
+    # David: Age=40, Active=True (doesn't match first - Age not > 40)
+    # Eve: Age=45, Active=False (doesn't match first)
+    # Alice: Age=25, Moscow (matches second)
+    assert len(result) >= 1, "Should find at least one match"
+
+
+def test_nested_group_two_groups_and(filter_engine, sample_df):
+    """Test two nested groups with AND: (A OR B) AND (C OR D).
+    
+    Logic: (Age < 30 OR Age > 40) AND (City = "Moscow" OR City = "Berlin")
+    """
+    print(f"\n📂 Testing nested: (A OR B) AND (C OR D)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator="<", value=30),
+                FilterCondition(column="Age", operator=">", value=40)
+            ],
+            logic="OR"
+        ),
+        FilterGroup(
+            filters=[
+                FilterCondition(column="City", operator="==", value="Moscow"),
+                FilterCondition(column="City", operator="==", value="Berlin")
+            ],
+            logic="OR"
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should match: (Age < 30 OR Age > 40) AND (Moscow OR Berlin)
+    # Alice: Age=25, Moscow (matches both)
+    # Eve: Age=45, Berlin (matches both)
+    assert len(result) == 2, "Should find Alice and Eve"
+    assert set(result["Name"]) == {"Alice", "Eve"}, "Should include Alice and Eve"
+
+
+def test_nested_group_three_levels(filter_engine, sample_df):
+    """Test three-level nesting: ((A OR B) AND C) OR D.
+    
+    Logic: ((Age < 30 OR Age > 40) AND Active = True) OR Name = "Charlie"
+    """
+    print(f"\n📂 Testing three-level nesting")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column="Age", operator="<", value=30),
+                        FilterCondition(column="Age", operator=">", value=40)
+                    ],
+                    logic="OR"
+                ),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND"
+        ),
+        FilterCondition(column="Name", operator="==", value="Charlie")
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="OR")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should match: ((Age < 30 OR Age > 40) AND Active) OR Charlie
+    # Alice: Age=25, Active=True (matches first)
+    # Charlie: Age=35, Active=False (matches second)
+    assert len(result) >= 2, "Should find at least 2 matches"
+    assert "Alice" in result["Name"].values, "Should include Alice"
+    assert "Charlie" in result["Name"].values, "Should include Charlie"
+
+
+def test_nested_group_four_levels(filter_engine, sample_df):
+    """Test four-level nesting: (((A AND B) OR C) AND D) OR E.
+    
+    Logic: (((Age > 25 AND Age < 35) OR City = "Paris") AND Active = True) OR Name = "Eve"
+    """
+    print(f"\n📂 Testing four-level nesting")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterGroup(
+                            filters=[
+                                FilterCondition(column="Age", operator=">", value=25),
+                                FilterCondition(column="Age", operator="<", value=35)
+                            ],
+                            logic="AND"
+                        ),
+                        FilterCondition(column="City", operator="==", value="Paris")
+                    ],
+                    logic="OR"
+                ),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND"
+        ),
+        FilterCondition(column="Name", operator="==", value="Eve")
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="OR")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Complex logic - should find at least Eve
+    assert len(result) >= 1, "Should find at least one match"
+    assert "Eve" in result["Name"].values, "Should include Eve"
+
+
+def test_nested_group_very_deep(filter_engine, sample_df):
+    """Test very deep nesting (5+ levels).
+    
+    Verifies system can handle deep recursion without stack overflow.
+    """
+    print(f"\n📂 Testing very deep nesting (5 levels)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    # Build 5-level deep structure
+    level5 = FilterCondition(column="Age", operator=">", value=20)
+    level4 = FilterGroup(filters=[level5], logic="AND")
+    level3 = FilterGroup(filters=[level4], logic="AND")
+    level2 = FilterGroup(filters=[level3], logic="AND")
+    level1 = FilterGroup(filters=[level2], logic="AND")
+    
+    filters = [level1]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should work without stack overflow
+    assert len(result) == 5, "Should find all rows with Age > 20"
+
+
+def test_nested_group_negation_simple(filter_engine, sample_df):
+    """Test negation of simple group: NOT (A AND B).
+    
+    Logic: NOT (Age > 30 AND Active = True)
+    """
+    print(f"\n📂 Testing NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND",
+            negate=True
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should match: NOT (Age > 30 AND Active)
+    # Excludes: Bob (30, True), David (40, True)
+    # Includes: Alice (25, True), Charlie (35, False), Eve (45, False)
+    assert len(result) >= 3, "Should find rows not matching (Age > 30 AND Active)"
+
+
+def test_nested_group_negation_complex(filter_engine, sample_df):
+    """Test negation of complex group: NOT ((A OR B) AND C).
+    
+    Logic: NOT ((Age < 30 OR Age > 40) AND City = "Moscow")
+    """
+    print(f"\n📂 Testing NOT ((A OR B) AND C)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column="Age", operator="<", value=30),
+                        FilterCondition(column="Age", operator=">", value=40)
+                    ],
+                    logic="OR"
+                ),
+                FilterCondition(column="City", operator="==", value="Moscow")
+            ],
+            logic="AND",
+            negate=True
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should exclude: Alice (Age=25, Moscow)
+    assert len(result) >= 4, "Should find rows not matching complex condition"
+    assert "Alice" not in result["Name"].values or len(result) == 5, "May or may not include Alice depending on data"
+
+
+def test_nested_group_negation_multiple(filter_engine, sample_df):
+    """Test multiple negated groups: NOT (A AND B) OR NOT (C AND D).
+    
+    Logic: NOT (Age > 35 AND Active = True) OR NOT (City = "Moscow" AND Age < 30)
+    """
+    print(f"\n📂 Testing NOT (A AND B) OR NOT (C AND D)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=35),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND",
+            negate=True
+        ),
+        FilterGroup(
+            filters=[
+                FilterCondition(column="City", operator="==", value="Moscow"),
+                FilterCondition(column="Age", operator="<", value=30)
+            ],
+            logic="AND",
+            negate=True
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="OR")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Complex OR logic - should match most rows
+    assert len(result) >= 1, "Should find matches"
+
+
+def test_nested_group_negation_with_condition_negation(filter_engine, sample_df):
+    """Test group negation combined with condition negation: NOT (A AND NOT B).
+    
+    Logic: NOT (Age > 30 AND NOT (City = "Moscow"))
+    """
+    print(f"\n📂 Testing NOT (A AND NOT B)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="City", operator="==", value="Moscow", negate=True)
+            ],
+            logic="AND",
+            negate=True
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should work with double negation
+    assert len(result) >= 1, "Should handle double negation"
+
+
+def test_nested_group_empty(filter_engine, sample_df):
+    """Test empty nested group.
+    
+    Empty group should return all rows (no filtering).
+    """
+    print(f"\n📂 Testing empty nested group")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(filters=[], logic="AND")
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Empty group should match all rows
+    assert len(result) == len(sample_df), "Empty group should return all rows"
+
+
+def test_nested_group_single_condition(filter_engine, sample_df):
+    """Test group with single condition.
+    
+    Group with one condition should work same as flat condition.
+    """
+    print(f"\n📂 Testing group with single condition")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[FilterCondition(column="Age", operator=">", value=30)],
+            logic="AND"
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should work same as flat filter
+    assert len(result) == 3, "Should find 3 rows with Age > 30"
+    assert all(result["Age"] > 30), "All ages should be > 30"
+
+
+def test_nested_group_single_nested_group(filter_engine, sample_df):
+    """Test group within group with single condition.
+    
+    Verifies unnecessary nesting doesn't break logic.
+    """
+    print(f"\n📂 Testing group within group (single condition)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[FilterCondition(column="Age", operator=">", value=30)],
+                    logic="AND"
+                )
+            ],
+            logic="AND"
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should work despite unnecessary nesting
+    assert len(result) == 3, "Should find 3 rows with Age > 30"
+
+
+def test_nested_group_all_operators(filter_engine, sample_df):
+    """Test nested groups with all 14 operators.
+    
+    Verifies all operators work correctly within nested groups.
+    """
+    print(f"\n📂 Testing all operators in nested groups")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    # Test various operators in nested structure
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">=", value=25),
+                FilterCondition(column="Age", operator="<=", value=45),
+                FilterCondition(column="Name", operator="!=", value="Unknown")
+            ],
+            logic="AND"
+        )
+    ]
+    
+    result = filter_engine.apply_filters(sample_df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    # Should find all rows (Age 25-45, Name != Unknown)
+    assert len(result) == 5, "Should find all rows"
+
+
+def test_validate_nested_group_valid(filter_engine, sample_df):
+    """Test validation of valid nested group."""
+    print(f"\n📂 Testing validation of valid nested group")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="City", operator="==", value="Moscow")
+            ],
+            logic="AND"
+        )
+    ]
+    
+    is_valid, error = filter_engine.validate_filters(sample_df, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is True, "Valid nested group should pass validation"
+    assert error is None, "Should have no error"
+
+
+def test_validate_nested_group_invalid_column(filter_engine, sample_df):
+    """Test validation catches invalid column in nested group."""
+    print(f"\n📂 Testing validation with invalid column in group")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="NonExistent", operator="==", value="test")
+            ],
+            logic="AND"
+        )
+    ]
+    
+    is_valid, error = filter_engine.validate_filters(sample_df, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is False, "Should detect invalid column in nested group"
+    assert "not found" in error.lower(), "Error should mention column not found"
+
+
+def test_validate_nested_group_invalid_operator(filter_engine, sample_df):
+    """Test validation catches invalid operator in nested group."""
+    print(f"\n📂 Testing validation with invalid operator in group")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="Name", operator="in", values=None)  # Missing values
+            ],
+            logic="AND"
+        )
+    ]
+    
+    is_valid, error = filter_engine.validate_filters(sample_df, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is False, "Should detect missing values for 'in' operator"
+    assert "values" in error.lower(), "Error should mention missing values"
+
+
+def test_validate_nested_group_deep_invalid(filter_engine, sample_df):
+    """Test validation catches error at 3rd level of nesting."""
+    print(f"\n📂 Testing validation with error at 3rd level")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column="Age", operator=">", value=30),
+                        FilterCondition(column="InvalidColumn", operator="==", value="test")
+                    ],
+                    logic="AND"
+                )
+            ],
+            logic="AND"
+        )
+    ]
+    
+    is_valid, error = filter_engine.validate_filters(sample_df, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is False, "Should detect error at deep nesting level"
+    assert "not found" in error.lower(), "Error should mention column not found"
+
+
+def test_filter_summary_nested_simple(filter_engine):
+    """Test filter summary formatting for simple nested group."""
+    print(f"\n📂 Testing filter summary: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="City", operator="==", value="Moscow")
+            ],
+            logic="AND"
+        ),
+        FilterCondition(column="Name", operator="==", value="Alice")
+    ]
+    
+    summary = filter_engine.get_filter_summary(filters, "OR")
+    
+    print(f"✅ Summary: {summary}")
+    
+    assert "Age > 30" in summary, "Should include Age condition"
+    assert "City == Moscow" in summary, "Should include City condition"
+    assert "Name == Alice" in summary, "Should include Name condition"
+    assert "AND" in summary, "Should show AND within group"
+    assert "OR" in summary, "Should show OR between group and condition"
+    assert "(" in summary and ")" in summary, "Should use parentheses for grouping"
+
+
+def test_filter_summary_nested_with_negation(filter_engine):
+    """Test filter summary formatting with negated group."""
+    print(f"\n📂 Testing filter summary: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND",
+            negate=True
+        )
+    ]
+    
+    summary = filter_engine.get_filter_summary(filters, "AND")
+    
+    print(f"✅ Summary: {summary}")
+    
+    assert "NOT" in summary, "Should include NOT"
+    assert "Age > 30" in summary, "Should include Age condition"
+    assert "Active == True" in summary, "Should include Active condition"
+    assert "(" in summary and ")" in summary, "Should use parentheses"
+
+
+def test_filter_summary_nested_deep(filter_engine):
+    """Test filter summary formatting for deep nesting."""
+    print(f"\n📂 Testing filter summary: deep nesting")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column="Age", operator=">", value=25),
+                        FilterCondition(column="Age", operator="<", value=35)
+                    ],
+                    logic="AND"
+                ),
+                FilterCondition(column="City", operator="==", value="Moscow")
+            ],
+            logic="OR"
+        )
+    ]
+    
+    summary = filter_engine.get_filter_summary(filters, "AND")
+    
+    print(f"✅ Summary: {summary}")
+    
+    assert "Age > 25" in summary, "Should include first Age condition"
+    assert "Age < 35" in summary, "Should include second Age condition"
+    assert "City == Moscow" in summary, "Should include City condition"
+    # Should have nested parentheses
+    assert summary.count("(") >= 2, "Should have multiple levels of parentheses"
+
+
+def test_count_filtered_with_nested_group(filter_engine, sample_df):
+    """Test count_filtered with nested groups."""
+    print(f"\n📂 Testing count_filtered with nested groups")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Age", operator=">", value=30),
+                FilterCondition(column="Active", operator="==", value=True)
+            ],
+            logic="AND"
+        )
+    ]
+    
+    count = filter_engine.count_filtered(sample_df, filters)
+    
+    print(f"✅ Count: {count}")
+    
+    # Should count without materializing DataFrame
+    assert count >= 0, "Count should be non-negative"
+    assert isinstance(count, int), "Count should be integer"

@@ -746,6 +746,7 @@ def test_invalid_logic_operator_in_filter(simple_fixture, file_loader):
     
     ops = DataOperations(file_loader)
     from mcp_excel.operations.filtering import FilterEngine
+    from mcp_excel.models.requests import FilterCondition
     
     filter_engine = FilterEngine()
     
@@ -754,17 +755,17 @@ def test_invalid_logic_operator_in_filter(simple_fixture, file_loader):
         simple_fixture.path_str, simple_fixture.sheet_name, None
     )
     
-    # Create valid filter
-    class ValidFilter:
-        column = simple_fixture.columns[0]
-        operator = "=="
-        value = "test"
-        values = None
-        negate = False  # Required field
+    # Create valid filter using real FilterCondition class
+    valid_filter = FilterCondition(
+        column=simple_fixture.columns[0],
+        operator="==",
+        value="test",
+        negate=False
+    )
     
     # Act & Assert
     with pytest.raises(ValueError) as exc_info:
-        filter_engine.apply_filters(df, [ValidFilter()], logic="INVALID")
+        filter_engine.apply_filters(df, [valid_filter], logic="INVALID")
     
     print(f"✅ Caught expected error: {exc_info.value}")
     
@@ -805,3 +806,163 @@ def test_get_column_stats_on_non_numeric(simple_fixture, file_loader):
         print(f"✅ Caught expected error: {e}")
         error_msg = str(e)
         assert "numeric" in error_msg.lower() or "number" in error_msg.lower(), "Error should mention numeric requirement"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS ERROR HANDLING TESTS
+# ============================================================================
+
+def test_nested_group_invalid_column(simple_fixture, file_loader):
+    """Test error handling for invalid column in nested group.
+    
+    Verifies:
+    - System detects invalid column inside nested group
+    - Error message is clear and helpful
+    """
+    print(f"\n❌ Testing error: Invalid column in nested group")
+    
+    from mcp_excel.models.requests import FilterGroup, FilterAndCountRequest
+    from mcp_excel.operations.data_operations import DataOperations
+    
+    ops = DataOperations(file_loader)
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        request = FilterAndCountRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column="ValidColumn", operator="==", value="test"),
+                        FilterCondition(column="NonExistentColumn", operator="==", value="test")
+                    ],
+                    logic="AND"
+                )
+            ]
+        )
+        ops.filter_and_count(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "not found" in error_msg.lower() or "nonexistentcolumn" in error_msg.lower(), \
+        "Error should mention column not found"
+
+
+def test_nested_group_deep_invalid_column(simple_fixture, file_loader):
+    """Test error handling for invalid column at 3rd level of nesting.
+    
+    Verifies:
+    - System detects errors at deep nesting levels
+    - Validation works recursively
+    """
+    print(f"\n❌ Testing error: Invalid column at 3rd nesting level")
+    
+    from mcp_excel.models.requests import FilterGroup, FilterAndCountRequest
+    from mcp_excel.operations.data_operations import DataOperations
+    
+    ops = DataOperations(file_loader)
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        request = FilterAndCountRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterGroup(
+                            filters=[
+                                FilterCondition(column=simple_fixture.columns[0], operator="==", value="test"),
+                                FilterCondition(column="DeepInvalidColumn", operator="==", value="test")
+                            ],
+                            logic="AND"
+                        )
+                    ],
+                    logic="AND"
+                )
+            ]
+        )
+        ops.filter_and_count(request)
+    
+    print(f"✅ Caught expected error at deep level: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "not found" in error_msg.lower(), "Error should mention column not found"
+
+
+def test_nested_group_empty_filters_list(simple_fixture, file_loader):
+    """Test handling of empty filters list in nested group.
+    
+    Verifies:
+    - Empty nested group is handled gracefully
+    - Returns all rows (no filtering)
+    """
+    print(f"\n🔍 Testing: Empty filters list in nested group")
+    
+    from mcp_excel.models.requests import FilterGroup, FilterAndCountRequest
+    from mcp_excel.operations.data_operations import DataOperations
+    
+    ops = DataOperations(file_loader)
+    
+    # Act - empty group should match all rows
+    request = FilterAndCountRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterGroup(filters=[], logic="AND")
+        ]
+    )
+    response = ops.filter_and_count(request)
+    
+    print(f"✅ Empty group handled: {response.count} rows (should be all rows)")
+    
+    # Empty group should return all rows
+    assert response.count > 0, "Empty group should match all rows"
+
+
+def test_nested_group_invalid_logic_operator(simple_fixture, file_loader):
+    """Test error handling for invalid logic operator in nested group.
+    
+    Verifies:
+    - Invalid logic operator is caught
+    - Error message mentions valid operators
+    """
+    print(f"\n❌ Testing error: Invalid logic operator in nested group")
+    
+    from mcp_excel.models.requests import FilterGroup
+    from mcp_excel.operations.filtering import FilterEngine
+    
+    filter_engine = FilterEngine()
+    
+    # Load DataFrame with proper headers (header_row=0)
+    # This ensures column names match simple_fixture.columns
+    df = file_loader.load(
+        simple_fixture.path_str, simple_fixture.sheet_name, header_row=0
+    )
+    
+    # Normalize column names to strings (as BaseOperations does in production)
+    # This makes FilterEngine robust for direct usage
+    df.columns = [str(col) for col in df.columns]
+    
+    # Create group with invalid logic (bypassing Pydantic validation for testing)
+    # We need to test FilterEngine directly since Pydantic would catch this
+    group = FilterGroup(
+        filters=[
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value="test")
+        ],
+        logic="AND"
+    )
+    # Manually override logic to invalid value
+    group.logic = "INVALID"
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        filter_engine.apply_filters(df, [group])
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    error_msg = str(exc_info.value)
+    assert "logic" in error_msg.lower() or "operator" in error_msg.lower(), \
+        "Error should mention logic operator"

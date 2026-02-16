@@ -1151,3 +1151,136 @@ def test_convert_datetime_filters_preserves_negate():
     # negate should be preserved after conversion
     assert converted[0].negate == True, "negate field should be preserved after datetime conversion"
     print("✅ Datetime conversion preserves negate field")
+
+
+# ============================================================================
+# NESTED FILTER GROUPS TESTS
+# ============================================================================
+
+def test_generate_formula_with_nested_group_returns_none():
+    """Test that formula generation returns None for nested groups."""
+    print("\n📂 Testing formula generation with nested group")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$A:$A", "Age": "Sheet1!$B:$B"}
+    
+    # Simple nested group: (Status=Active AND Age>30) OR Status=VIP
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Status", operator="==", value="Active"),
+                FilterCondition(column="Age", operator=">", value=30)
+            ],
+            logic="AND"
+        ),
+        FilterCondition(column="Status", operator="==", value="VIP")
+    ]
+    
+    formula = gen.generate_from_filter("count", filters, column_ranges)
+    
+    print(f"   Formula: {formula}")
+    
+    # Nested groups are not supported in Excel formulas
+    assert formula is None, "Formula should be None for nested groups"
+    print("✅ Formula generation correctly returns None for nested groups")
+
+
+def test_generate_formula_flat_filters_still_works():
+    """Test that flat filters still generate formulas after nested group support."""
+    print("\n📂 Testing flat filters still work")
+    
+    gen = FormulaGenerator("Sheet1")
+    column_ranges = {"Status": "Sheet1!$A:$A", "Age": "Sheet1!$B:$B"}
+    
+    # Flat filters (no groups)
+    filters = [
+        FilterCondition(column="Status", operator="==", value="Active"),
+        FilterCondition(column="Age", operator=">", value=30)
+    ]
+    
+    formula = gen.generate_from_filter("count", filters, column_ranges)
+    
+    print(f"   Formula: {formula}")
+    
+    # Flat filters should still generate formulas
+    assert formula is not None, "Formula should be generated for flat filters"
+    assert "COUNTIFS" in formula, "Should use COUNTIFS for multiple flat conditions"
+    print("✅ Flat filters still generate formulas correctly")
+
+
+def test_convert_datetime_filters_nested_group():
+    """Test datetime conversion in nested groups."""
+    print("\n📂 Testing datetime conversion in nested groups")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    gen = FormulaGenerator("Sheet1")
+    column_types = {"Date": "datetime", "Status": "string"}
+    
+    # Nested group with datetime filter
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterCondition(column="Date", operator=">=", value="2024-01-01"),
+                FilterCondition(column="Status", operator="==", value="Active")
+            ],
+            logic="AND"
+        )
+    ]
+    
+    converted = gen._convert_datetime_filters(filters, column_types)
+    
+    print(f"   Original type: {type(filters[0])}")
+    print(f"   Converted type: {type(converted[0])}")
+    
+    # Should preserve FilterGroup structure
+    assert isinstance(converted[0], FilterGroup), "Should preserve FilterGroup type"
+    assert len(converted[0].filters) == 2, "Should have 2 filters in group"
+    
+    # Check datetime conversion happened inside group
+    date_filter = converted[0].filters[0]
+    assert isinstance(date_filter.value, pd.Timestamp), "Date value should be converted to Timestamp"
+    
+    print("✅ Datetime conversion works in nested groups")
+
+
+def test_convert_datetime_filters_deep_nesting():
+    """Test datetime conversion in deeply nested groups (3+ levels)."""
+    print("\n📂 Testing datetime conversion in deep nesting")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    gen = FormulaGenerator("Sheet1")
+    column_types = {"Date": "datetime", "Status": "string", "Amount": "float"}
+    
+    # Deep nesting: ((Date >= X AND Status = Y) OR Amount > Z)
+    filters = [
+        FilterGroup(
+            filters=[
+                FilterGroup(
+                    filters=[
+                        FilterCondition(column="Date", operator=">=", value="2024-01-01"),
+                        FilterCondition(column="Status", operator="==", value="Active")
+                    ],
+                    logic="AND"
+                ),
+                FilterCondition(column="Amount", operator=">", value=1000)
+            ],
+            logic="OR"
+        )
+    ]
+    
+    converted = gen._convert_datetime_filters(filters, column_types)
+    
+    print(f"   Nesting levels: 3")
+    print(f"   Converted successfully: {isinstance(converted[0], FilterGroup)}")
+    
+    # Navigate to the datetime filter at level 3
+    outer_group = converted[0]
+    inner_group = outer_group.filters[0]
+    date_filter = inner_group.filters[0]
+    
+    assert isinstance(date_filter.value, pd.Timestamp), "Date value should be converted at deep nesting level"
+    print("✅ Datetime conversion works at deep nesting levels")

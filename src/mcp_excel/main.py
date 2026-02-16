@@ -81,6 +81,11 @@ LOGIC_DESCRIPTION = """Logic operator for combining multiple filters.
 AND: ALL conditions must be true (intersection)
 OR: AT LEAST ONE condition must be true (union)
 
+NESTED GROUPS: You can create complex logical expressions using nested groups:
+- (A AND B) OR C: Use a group with AND logic for A,B, then combine with C using OR
+- A AND (B OR C): Use a group with OR logic for B,C, then combine with A using AND
+- ((A OR B) AND C) OR D: Nest groups within groups for complex logic
+
 NUMERICAL EXAMPLE:
 Dataset: 100 rows | Filter A: 30 rows | Filter B: 20 rows | Overlap: 5 rows
 → AND returns 5 rows (intersection) | OR returns 45 rows (30+20-5, union)
@@ -90,33 +95,76 @@ COMMON PATTERNS:
 - Union of conditions: Use OR logic (e.g., Category A OR Category B)
 - Intersection of conditions: Use AND logic (e.g., Age > 30 AND City = "Moscow")
 - Exclude records: Use != or not_in operators
+- Complex logic: Use nested groups (e.g., (Status=Active AND Amount>1000) OR (Status=VIP))
 
 Default: AND"""
 
-FILTER_SCHEMA = {
-    "type": "array",
-    "description": "List of filter conditions to apply",
-    "items": {
-        "type": "object",
-        "properties": {
-            "column": {"type": "string", "description": "Column name to filter on"},
-            "operator": {
-                "type": "string",
-                "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
-                "description": OPERATOR_DESCRIPTION
-            },
-            "value": {"description": "Value for single-value operators (==, !=, >, <, >=, <=, contains, startswith, endswith, regex, is_null, is_not_null)"},
-            "values": {
-                "type": "array",
-                "description": "List of values for set operators (in, not_in). Example: ['Active', 'Pending']"
-            },
-            "negate": {
-                "type": "boolean",
-                "default": False,
-                "description": "Negate the condition (NOT operator). Inverts the result of the filter."
+# Define FilterCondition schema (atomic filter)
+FILTER_CONDITION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "column": {"type": "string", "description": "Column name to filter on"},
+        "operator": {
+            "type": "string",
+            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+            "description": OPERATOR_DESCRIPTION
+        },
+        "value": {"description": "Value for single-value operators (==, !=, >, <, >=, <=, contains, startswith, endswith, regex, is_null, is_not_null)"},
+        "values": {
+            "type": "array",
+            "description": "List of values for set operators (in, not_in). Example: ['Active', 'Pending']"
+        },
+        "negate": {
+            "type": "boolean",
+            "default": False,
+            "description": "Negate the condition (NOT operator). Inverts the result of the filter."
+        }
+    },
+    "required": ["column", "operator"]
+}
+
+# Define FilterGroup schema (nested group of filters)
+# Note: This is defined as a separate variable to enable recursive reference
+FILTER_GROUP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "filters": {
+            "type": "array",
+            "description": "List of filter conditions or nested groups",
+            "items": {
+                "oneOf": [
+                    FILTER_CONDITION_SCHEMA,
+                    {"$ref": "#/definitions/FilterGroup"}
+                ]
             }
         },
-        "required": ["column", "operator"]
+        "logic": {
+            "type": "string",
+            "enum": ["AND", "OR"],
+            "description": LOGIC_DESCRIPTION,
+            "default": "AND"
+        },
+        "negate": {
+            "type": "boolean",
+            "default": False,
+            "description": "Negate the entire group (NOT operator). Inverts the result of all filters in this group."
+        }
+    },
+    "required": ["filters"]
+}
+
+# Main filter schema - accepts both FilterCondition and FilterGroup
+FILTER_SCHEMA = {
+    "type": "array",
+    "description": "List of filter conditions or nested groups. Supports complex logical expressions like (A AND B) OR C.",
+    "items": {
+        "oneOf": [
+            FILTER_CONDITION_SCHEMA,
+            FILTER_GROUP_SCHEMA
+        ]
+    },
+    "definitions": {
+        "FilterGroup": FILTER_GROUP_SCHEMA
     }
 }
 

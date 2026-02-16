@@ -284,7 +284,7 @@ class StatisticsOperations(BaseOperations):
         # Generate TSV output
         if outlier_rows:
             # Include all columns plus row index
-            headers = ["_row_index"] + df.columns.tolist()
+            headers = ["_row_index"] + [str(col) for col in df.columns]
             rows = []
 
             for row in outlier_rows:

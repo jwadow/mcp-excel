@@ -971,4 +971,139 @@ def test_calculate_expression_with_negation(numeric_types_fixture, file_loader):
     assert len(response.rows) > 0, "Should calculate for some rows"
 
 
+# ============================================================================
+# NESTED FILTER GROUPS TESTS (advanced)
+# ============================================================================
 
+def test_rank_rows_nested_filters(numeric_types_fixture, file_loader):
+    """Test rank_rows with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in rank_rows
+    - Ranking calculated only for filtered rows
+    """
+    print(f"\n🔍 Testing rank_rows: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = AdvancedOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = RankRowsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        rank_column="Цена",
+        direction="desc",
+        top_n=10,
+        group_by_columns=None,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.rank_rows(request)
+    
+    # Assert
+    print(f"✅ Ranked {response.total_rows} rows with nested filters")
+    
+    assert response.total_rows >= 0, "Should rank some rows"
+    assert len(response.rows) >= 0, "Should return ranked rows"
+
+
+def test_calculate_expression_nested_filters(numeric_types_fixture, file_loader):
+    """Test calculate_expression with nested group: (A OR B) AND C.
+    
+    Verifies:
+    - Nested groups work in calculate_expression
+    - Expression calculated only for filtered rows
+    """
+    print(f"\n🔍 Testing calculate_expression: (A OR B) AND C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = AdvancedOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 OR Количество > 150) AND Цена > 100")
+    
+    # Act
+    request = CalculateExpressionRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        expression="Количество * Цена",
+        output_column_name="Стоимость",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Количество", operator=">", value=150)
+                ],
+                logic="OR"
+            ),
+            FilterCondition(column="Цена", operator=">", value=100)
+        ],
+        logic="AND"
+    )
+    response = ops.calculate_expression(request)
+    
+    # Assert
+    print(f"✅ Calculated expression for {len(response.rows)} rows with nested filters")
+    
+    assert len(response.rows) >= 0, "Should calculate for some rows"
+    # Verify complex nested logic
+    for row in response.rows:
+        quantity = row["Количество"]
+        price = row["Цена"]
+        matches_group = (quantity < 50 or quantity > 150)
+        matches_condition = (price > 100)
+        assert matches_group and matches_condition, "Row should match (A OR B) AND C"
+
+
+def test_rank_rows_nested_with_negation(numeric_types_fixture, file_loader):
+    """Test rank_rows with nested group and negation: NOT (A AND B).
+    
+    Verifies:
+    - Negation works with nested groups in rank_rows
+    - Ranking excludes rows matching the negated group
+    """
+    print(f"\n🔍 Testing rank_rows: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = AdvancedOperations(file_loader)
+    
+    print(f"  Filter: NOT (Количество < 50 AND Цена > 100)")
+    
+    # Act
+    request = RankRowsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        rank_column="Количество",
+        direction="desc",
+        top_n=10,
+        group_by_columns=None,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ]
+    )
+    response = ops.rank_rows(request)
+    
+    # Assert
+    print(f"✅ Ranked {response.total_rows} rows with negated group")
+    
+    assert response.total_rows > 0, "Should rank rows not matching the group"

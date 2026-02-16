@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from ..models.requests import FilterCondition
+from ..models.requests import FilterCondition, FilterGroup
 
 
 class FormulaGenerator:
@@ -77,16 +77,16 @@ class FormulaGenerator:
     
     def _convert_datetime_filters(
         self,
-        filters: list[FilterCondition],
+        filters: list[FilterCondition | FilterGroup],
         column_types: dict[str, str]
-    ) -> list[FilterCondition]:
-        """Convert string datetime values in filters to pd.Timestamp.
+    ) -> list[FilterCondition | FilterGroup]:
+        """Convert string datetime values in filters to pd.Timestamp (recursive).
         
         This ensures that datetime filter values are properly formatted as
         DATE() functions in Excel formulas.
         
         Args:
-            filters: List of filter conditions
+            filters: List of filter conditions or nested groups
             column_types: Mapping of column names to types
         
         Returns:
@@ -94,49 +94,60 @@ class FormulaGenerator:
         """
         converted_filters = []
         
-        for filter_cond in filters:
-            # Check if this column is a datetime type
-            col_type = column_types.get(filter_cond.column)
-            
-            if col_type == "datetime":
-                # Convert string datetime values to pd.Timestamp
-                if isinstance(filter_cond.value, str):
-                    try:
-                        # Parse ISO 8601 string to Timestamp
-                        converted_value = pd.to_datetime(filter_cond.value)
-                        # Create new filter with converted value
+        for filter_item in filters:
+            if isinstance(filter_item, FilterCondition):
+                # Convert datetime values in atomic condition
+                filter_cond = filter_item
+                col_type = column_types.get(filter_cond.column)
+                
+                if col_type == "datetime":
+                    # Convert string datetime values to pd.Timestamp
+                    if isinstance(filter_cond.value, str):
+                        try:
+                            # Parse ISO 8601 string to Timestamp
+                            converted_value = pd.to_datetime(filter_cond.value)
+                            # Create new filter with converted value
+                            filter_cond = FilterCondition(
+                                column=filter_cond.column,
+                                operator=filter_cond.operator,
+                                value=converted_value,
+                                values=filter_cond.values,
+                                negate=filter_cond.negate
+                            )
+                        except Exception:
+                            # If conversion fails, keep original value
+                            pass
+                    
+                    # Also convert values list if present (for 'in' operator)
+                    if filter_cond.values:
+                        converted_values = []
+                        for val in filter_cond.values:
+                            if isinstance(val, str):
+                                try:
+                                    converted_values.append(pd.to_datetime(val))
+                                except Exception:
+                                    converted_values.append(val)
+                            else:
+                                converted_values.append(val)
+                        
                         filter_cond = FilterCondition(
                             column=filter_cond.column,
                             operator=filter_cond.operator,
-                            value=converted_value,
-                            values=filter_cond.values,
+                            value=filter_cond.value,
+                            values=converted_values,
                             negate=filter_cond.negate
                         )
-                    except Exception:
-                        # If conversion fails, keep original value
-                        pass
                 
-                # Also convert values list if present (for 'in' operator)
-                if filter_cond.values:
-                    converted_values = []
-                    for val in filter_cond.values:
-                        if isinstance(val, str):
-                            try:
-                                converted_values.append(pd.to_datetime(val))
-                            except Exception:
-                                converted_values.append(val)
-                        else:
-                            converted_values.append(val)
-                    
-                    filter_cond = FilterCondition(
-                        column=filter_cond.column,
-                        operator=filter_cond.operator,
-                        value=filter_cond.value,
-                        values=converted_values,
-                        negate=filter_cond.negate
-                    )
+                converted_filters.append(filter_cond)
             
-            converted_filters.append(filter_cond)
+            elif isinstance(filter_item, FilterGroup):
+                # Convert datetime values in nested group - RECURSION
+                converted_group = FilterGroup(
+                    filters=self._convert_datetime_filters(filter_item.filters, column_types),
+                    logic=filter_item.logic,
+                    negate=filter_item.negate
+                )
+                converted_filters.append(converted_group)
         
         return converted_filters
 
@@ -261,7 +272,7 @@ class FormulaGenerator:
     def generate_from_filter(
         self,
         operation: str,
-        filters: list[FilterCondition],
+        filters: list[FilterCondition | FilterGroup],
         column_ranges: dict[str, str],
         target_range: Optional[str] = None,
         column_types: Optional[dict[str, str]] = None,
@@ -270,17 +281,24 @@ class FormulaGenerator:
 
         Args:
             operation: Operation type (count, sum, mean, etc.)
-            filters: List of filter conditions
+            filters: List of filter conditions or nested groups
             column_ranges: Mapping of column names to Excel ranges
             target_range: Target range for aggregation (required for sum/mean)
             column_types: Optional mapping of column names to types (for datetime handling)
 
         Returns:
             Excel formula string, or None if filters use operators not supported in Excel
+            (including nested groups which are too complex for Excel formulas)
 
         Raises:
             ValueError: If operation is not supported or parameters are invalid
         """
+        # Check if filters contain nested groups
+        # Nested groups are too complex for Excel formulas - return None
+        has_nested_groups = any(isinstance(f, FilterGroup) for f in filters)
+        if has_nested_groups:
+            return None
+        
         # Convert datetime filter values if column types are provided
         if column_types:
             filters = self._convert_datetime_filters(filters, column_types)
@@ -306,9 +324,13 @@ class FormulaGenerator:
             else:
                 raise ValueError(f"Operation {operation} requires filters or target range")
 
-        # Single filter
+        # Single filter (guaranteed to be FilterCondition after nested group check)
         if len(filters) == 1:
             filter_cond = filters[0]
+            # Type assertion: we know it's FilterCondition because we checked for groups above
+            if not isinstance(filter_cond, FilterCondition):
+                return None
+            
             criteria_range = column_ranges.get(filter_cond.column)
             if not criteria_range:
                 raise ValueError(f"Column {filter_cond.column} not found in ranges")
@@ -318,8 +340,14 @@ class FormulaGenerator:
             )
 
         # Multiple filters - use SUMIFS/COUNTIFS
+        # Type assertion: all items are FilterCondition (groups already filtered out)
+        filter_conditions = [f for f in filters if isinstance(f, FilterCondition)]
+        if len(filter_conditions) != len(filters):
+            # Should not happen due to earlier check, but be safe
+            return None
+        
         return self._generate_multiple_filters_formula(
-            operation, filters, column_ranges, target_range
+            operation, filter_conditions, column_ranges, target_range
         )
     
     def _generate_single_filter_formula(

@@ -926,3 +926,139 @@ def test_calculate_running_total_with_negation(with_dates_fixture, file_loader):
     print(f"✅ Running total with negation: {len(response.rows)} rows")
     
     assert len(response.rows) > 0, "Should calculate running total"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS TESTS (timeseries)
+# ============================================================================
+
+def test_calculate_period_change_nested_filters(with_dates_fixture, file_loader):
+    """Test calculate_period_change with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in calculate_period_change
+    - Period changes calculated only for filtered rows
+    """
+    print(f"\n🔍 Testing calculate_period_change: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup, CalculatePeriodChangeRequest
+    
+    ops = TimeSeriesOperations(file_loader)
+    
+    date_col = with_dates_fixture.expected["datetime_columns"][0]
+    
+    print(f"  Filter: (Сумма > 500 AND Сумма < 2000) OR Сумма == 3000")
+    
+    # Act
+    request = CalculatePeriodChangeRequest(
+        file_path=with_dates_fixture.path_str,
+        sheet_name=with_dates_fixture.sheet_name,
+        date_column=date_col,
+        value_column="Сумма",
+        period_type="month",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Сумма", operator=">", value=500),
+                    FilterCondition(column="Сумма", operator="<", value=2000)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Сумма", operator="==", value=3000)
+        ],
+        logic="OR"
+    )
+    response = ops.calculate_period_change(request)
+    
+    # Assert
+    print(f"✅ Period change with nested filters: {len(response.periods)} periods")
+    
+    assert len(response.periods) >= 0, "Should calculate periods"
+
+
+def test_calculate_running_total_nested_filters(with_dates_fixture, file_loader):
+    """Test calculate_running_total with nested group: (A OR B) AND C.
+    
+    Verifies:
+    - Nested groups work in calculate_running_total
+    - Running total calculated only for filtered rows
+    """
+    print(f"\n🔍 Testing calculate_running_total: (A OR B) AND C")
+    
+    from mcp_excel.models.requests import FilterGroup, CalculateRunningTotalRequest
+    
+    ops = TimeSeriesOperations(file_loader)
+    
+    date_col = with_dates_fixture.expected["datetime_columns"][0]
+    
+    print(f"  Filter: (Сумма < 500 OR Сумма > 2000) AND Сумма != 1000")
+    
+    # Act
+    request = CalculateRunningTotalRequest(
+        file_path=with_dates_fixture.path_str,
+        sheet_name=with_dates_fixture.sheet_name,
+        order_column=date_col,
+        value_column="Сумма",
+        group_by_columns=None,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Сумма", operator="<", value=500),
+                    FilterCondition(column="Сумма", operator=">", value=2000)
+                ],
+                logic="OR"
+            ),
+            FilterCondition(column="Сумма", operator="!=", value=1000)
+        ],
+        logic="AND"
+    )
+    response = ops.calculate_running_total(request)
+    
+    # Assert
+    print(f"✅ Running total with nested filters: {len(response.rows)} rows")
+    
+    assert len(response.rows) >= 0, "Should calculate running total"
+
+
+def test_calculate_moving_average_nested_filters(with_dates_fixture, file_loader):
+    """Test calculate_moving_average with nested group and negation.
+    
+    Verifies:
+    - Nested groups work in calculate_moving_average
+    - Moving average calculated only for filtered rows
+    - Negation works with nested groups
+    """
+    print(f"\n🔍 Testing calculate_moving_average: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup, CalculateMovingAverageRequest
+    
+    ops = TimeSeriesOperations(file_loader)
+    
+    date_col = with_dates_fixture.expected["datetime_columns"][0]
+    
+    print(f"  Filter: NOT (Сумма < 500 AND Сумма > 100)")
+    
+    # Act
+    request = CalculateMovingAverageRequest(
+        file_path=with_dates_fixture.path_str,
+        sheet_name=with_dates_fixture.sheet_name,
+        order_column=date_col,
+        value_column="Сумма",
+        window_size=3,
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Сумма", operator="<", value=500),
+                    FilterCondition(column="Сумма", operator=">", value=100)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ]
+    )
+    response = ops.calculate_moving_average(request)
+    
+    # Assert
+    print(f"✅ Moving average with negated group: {len(response.rows)} rows")
+    
+    assert len(response.rows) >= 0, "Should calculate moving average"

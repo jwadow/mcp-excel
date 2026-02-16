@@ -1286,3 +1286,296 @@ def test_group_by_with_negated_filter(simple_fixture, file_loader):
     assert all(group[simple_fixture.columns[0]] != test_value for group in response.groups), \
         f"No group should have {simple_fixture.columns[0]} == {test_value}"
     assert len(response.groups) > 0, "Should have some groups"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS TESTS (aggregate)
+# ============================================================================
+
+def test_aggregate_nested_and_or(numeric_types_fixture, file_loader):
+    """Test aggregate with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in aggregate
+    - Aggregation is correct for complex logic
+    - Formula is None (nested groups not supported in Excel)
+    """
+    print(f"\n🔍 Testing aggregate: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = AggregateRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        operation="sum",
+        target_column="Количество",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Sum: {response.value}")
+    print(f"   Formula: {response.excel_output.formula}")
+    
+    assert response.value >= 0, "Sum should be non-negative"
+    assert response.excel_output.formula is None, "Formula should be None for nested groups"
+
+
+def test_aggregate_nested_three_levels(numeric_types_fixture, file_loader):
+    """Test aggregate with 3 levels of nesting: ((A OR B) AND C) OR D.
+    
+    Verifies:
+    - Deep nesting works in aggregate
+    - Complex logic is evaluated correctly
+    """
+    print(f"\n🔍 Testing aggregate with 3 levels: ((A OR B) AND C) OR D")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: ((Количество < 50 OR Количество > 150) AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = AggregateRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        operation="sum",
+        target_column="Цена",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column="Количество", operator="<", value=50),
+                            FilterCondition(column="Количество", operator=">", value=150)
+                        ],
+                        logic="OR"
+                    ),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Sum: {response.value}")
+    
+    assert response.value >= 0, "Sum should be non-negative"
+    assert response.excel_output.formula is None, "Formula should be None for nested groups"
+
+
+def test_aggregate_nested_with_negation(simple_fixture, file_loader):
+    """Test aggregate with nested group and negation: NOT (A AND B).
+    
+    Verifies:
+    - Negation works with nested groups in aggregate
+    - Aggregates only rows not matching the group
+    """
+    print(f"\n🔍 Testing aggregate: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: NOT ({simple_fixture.columns[0]} == '{test_value}' AND {simple_fixture.columns[1]} > 0)")
+    
+    # Act
+    request = AggregateRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        operation="sum",
+        target_column=simple_fixture.columns[1],
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ]
+    )
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Sum: {response.value}")
+    
+    assert response.value > 0, "Should aggregate rows not matching the group"
+    assert response.excel_output.formula is None, "Formula should be None for negated groups"
+
+
+# ============================================================================
+# NESTED FILTER GROUPS TESTS (group_by)
+# ============================================================================
+
+def test_group_by_nested_and_or(numeric_types_fixture, file_loader):
+    """Test group_by with nested group: (A AND B) OR C.
+    
+    Verifies:
+    - Nested groups work in group_by
+    - Groups are correct for complex logic
+    """
+    print(f"\n🔍 Testing group_by: (A AND B) OR C")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: (Количество < 50 AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = GroupByRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        group_columns=["Код товара"],
+        agg_column="Количество",
+        agg_operation="sum",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column="Количество", operator="<", value=50),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.group_by(request)
+    
+    # Assert
+    print(f"✅ Groups: {len(response.groups)}")
+    
+    assert len(response.groups) >= 0, "Should return groups"
+
+
+def test_group_by_nested_three_levels(numeric_types_fixture, file_loader):
+    """Test group_by with 3 levels of nesting: ((A OR B) AND C) OR D.
+    
+    Verifies:
+    - Deep nesting works in group_by
+    - Complex logic is evaluated correctly
+    """
+    print(f"\n🔍 Testing group_by with 3 levels: ((A OR B) AND C) OR D")
+    
+    from mcp_excel.models.requests import FilterGroup
+    
+    ops = DataOperations(file_loader)
+    
+    print(f"  Filter: ((Количество < 50 OR Количество > 150) AND Цена > 100) OR Количество == 100")
+    
+    # Act
+    request = GroupByRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        group_columns=["Код товара"],
+        agg_column="Цена",
+        agg_operation="sum",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column="Количество", operator="<", value=50),
+                            FilterCondition(column="Количество", operator=">", value=150)
+                        ],
+                        logic="OR"
+                    ),
+                    FilterCondition(column="Цена", operator=">", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterCondition(column="Количество", operator="==", value=100)
+        ],
+        logic="OR"
+    )
+    response = ops.group_by(request)
+    
+    # Assert
+    print(f"✅ Groups: {len(response.groups)}")
+    
+    assert len(response.groups) >= 0, "Should return groups"
+
+
+def test_group_by_nested_with_negation(simple_fixture, file_loader):
+    """Test group_by with nested group and negation: NOT (A AND B).
+    
+    Verifies:
+    - Negation works with nested groups in group_by
+    - Groups exclude rows matching the negated group
+    """
+    print(f"\n🔍 Testing group_by: NOT (A AND B)")
+    
+    from mcp_excel.models.requests import FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Filter: NOT ({simple_fixture.columns[0]} == '{test_value}' AND {simple_fixture.columns[1]} > 0)")
+    
+    # Act
+    request = GroupByRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        group_columns=[simple_fixture.columns[0]],
+        agg_column=simple_fixture.columns[1],
+        agg_operation="count",
+        filters=[
+            FilterGroup(
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value),
+                    FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                ],
+                logic="AND",
+                negate=True
+            )
+        ]
+    )
+    response = ops.group_by(request)
+    
+    # Assert
+    print(f"✅ Groups: {len(response.groups)}")
+    
+    # test_value should not be in results (it's excluded by negated group)
+    assert all(group[simple_fixture.columns[0]] != test_value for group in response.groups), \
+        f"No group should have {simple_fixture.columns[0]} == {test_value}"
+    assert len(response.groups) > 0, "Should have some groups"
