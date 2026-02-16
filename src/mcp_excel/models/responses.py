@@ -331,6 +331,25 @@ class GetDataProfileResponse(BaseModel):
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
 
+class FilterSetResult(BaseModel):
+    """Result for a single filter set."""
+
+    label: Optional[str] = Field(description="Label of the filter set (if provided)")
+    count: int = Field(description="Number of rows matching this filter set")
+    filters_applied: list[dict[str, Any]] = Field(description="Filters that were applied in this set")
+    formula: Optional[str] = Field(default=None, description="Excel formula for this filter set")
+
+
+class FilterAndCountBatchResponse(BaseModel):
+    """Response for batch filter and count operation."""
+
+    results: list[FilterSetResult] = Field(description="Results for each filter set in order")
+    total_filter_sets: int = Field(description="Number of filter sets processed")
+    excel_output: ExcelOutput = Field(description="TSV table with all results for copy-paste to Excel")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
 class ErrorResponse(BaseModel):
     """Error response."""
 

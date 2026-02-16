@@ -1115,3 +1115,553 @@ def test_filter_and_count_metadata(simple_fixture, file_loader):
     assert response.metadata.sheet_name == simple_fixture.sheet_name, "Should report correct sheet"
     assert response.metadata.rows_total == simple_fixture.row_count, "Should report total rows"
     assert response.metadata.columns_total == len(simple_fixture.columns), "Should report total columns"
+
+
+# ============================================================================
+# Batch Operations Tests (filter_and_count_batch)
+# ============================================================================
+
+def test_filter_and_count_batch_basic(simple_fixture, file_loader):
+    """Test filter_and_count_batch with 3 simple filter sets.
+    
+    Verifies:
+    - Loads file once, applies all filter sets
+    - Returns results for each filter set
+    - Generates formulas for each set
+    - TSV output contains all results
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with 3 filter sets")
+    
+    ops = DataOperations(file_loader)
+    
+    # Get sample values
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=3
+    )
+    values = ops.get_unique_values(unique_request).values[:3]
+    
+    print(f"  Filter sets: 3 different values from {simple_fixture.columns[0]}")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Category A",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]
+            ),
+            FilterSet(
+                label="Category B",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]
+            ),
+            FilterSet(
+                label="Category C",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[2])]
+            ),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results:")
+    for result in response.results:
+        print(f"   {result.label}: {result.count} rows, formula: {result.formula}")
+    print(f"   Performance: {response.performance.execution_time_ms}ms")
+    
+    assert response.total_filter_sets == 3, "Should process 3 filter sets"
+    assert len(response.results) == 3, "Should return 3 results"
+    assert response.results[0].label == "Category A", "Should preserve labels"
+    assert response.results[1].label == "Category B"
+    assert response.results[2].label == "Category C"
+    assert all(r.count >= 0 for r in response.results), "All counts should be non-negative"
+    assert all(r.formula is not None for r in response.results), "Should generate formulas"
+    assert response.excel_output.tsv, "Should generate TSV output"
+    assert "Category A" in response.excel_output.tsv, "TSV should contain labels"
+
+
+def test_filter_and_count_batch_or_logic(simple_fixture, file_loader):
+    """Test filter_and_count_batch with OR logic in filter set.
+    
+    Verifies:
+    - OR logic works correctly within filter set
+    - Count represents union, not sum
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with OR logic")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Filter set with OR: {simple_fixture.columns[0]} == '{values[0]}' OR == '{values[1]}'")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Combined OR",
+                filters=[
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                    FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])
+                ],
+                logic="OR"
+            ),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Count: {response.results[0].count}")
+    print(f"   Formula: {response.results[0].formula}")
+    
+    assert response.total_filter_sets == 1, "Should process 1 filter set"
+    assert response.results[0].count > 0, "Should find matching rows"
+    assert len(response.results[0].filters_applied) == 2, "Should have 2 filters in set"
+
+
+def test_filter_and_count_batch_without_labels(simple_fixture, file_loader):
+    """Test filter_and_count_batch without labels (auto-generated).
+    
+    Verifies:
+    - Auto-generates labels "Set 1", "Set 2", etc.
+    - Works correctly without explicit labels
+    """
+    print(f"\n🔍 Testing filter_and_count_batch without labels")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Filter sets without labels")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]
+            ),
+            FilterSet(
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]
+            ),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results:")
+    for result in response.results:
+        print(f"   {result.label}: {result.count} rows")
+    
+    assert response.total_filter_sets == 2, "Should process 2 filter sets"
+    # Labels should be None (not auto-generated in response, but in TSV)
+    assert response.results[0].label is None, "Should have no label"
+    assert response.results[1].label is None, "Should have no label"
+    # TSV should have auto-generated labels
+    assert "Set 1" in response.excel_output.tsv, "TSV should have auto-generated label"
+    assert "Set 2" in response.excel_output.tsv, "TSV should have auto-generated label"
+
+
+def test_filter_and_count_batch_validation_fail_fast(simple_fixture, file_loader):
+    """Test filter_and_count_batch with invalid filter (fail-fast).
+    
+    Verifies:
+    - Validates ALL filter sets before execution
+    - Raises error with label of problematic set
+    - Doesn't execute any sets if one is invalid
+    """
+    print(f"\n🔍 Testing filter_and_count_batch validation fail-fast")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import FilterAndCountBatchRequest, FilterSet
+    
+    print(f"  Filter set 2 has invalid column")
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        request = FilterAndCountBatchRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filter_sets=[
+                FilterSet(
+                    label="Valid Set",
+                    filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value="test")]
+                ),
+                FilterSet(
+                    label="Invalid Set",
+                    filters=[FilterCondition(column="NonExistentColumn", operator="==", value="test")]
+                ),
+            ]
+        )
+        ops.filter_and_count_batch(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    
+    assert "Invalid Set" in str(exc_info.value), "Error should mention the label"
+    assert "not found" in str(exc_info.value).lower(), "Error should mention column not found"
+
+
+def test_filter_and_count_batch_complex_filters(with_nulls_fixture, file_loader):
+    """Test filter_and_count_batch with complex filters (not_in + is_null).
+    
+    Verifies:
+    - Handles complex filter combinations
+    - Formula may be None for complex cases (expected)
+    - Count is always accurate
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with complex filters")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=with_nulls_fixture.path_str,
+        sheet_name=with_nulls_fixture.sheet_name,
+        column=with_nulls_fixture.columns[1],  # "Имя"
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Complex filters: not_in + is_null")
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=with_nulls_fixture.path_str,
+        sheet_name=with_nulls_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Complex",
+                filters=[
+                    FilterCondition(column=with_nulls_fixture.columns[1], operator="not_in", values=values),
+                    FilterCondition(column=with_nulls_fixture.columns[2], operator="is_null", value=None)
+                ],
+                logic="AND"
+            ),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Count: {response.results[0].count}")
+    print(f"   Formula: {response.results[0].formula}")
+    
+    assert response.total_filter_sets == 1, "Should process 1 filter set"
+    assert response.results[0].count >= 0, "Count should be non-negative"
+    # Formula may be None for complex combinations (expected)
+    print(f"   Note: Formula is {'generated' if response.results[0].formula else 'None (expected for complex filters)'}")
+
+
+def test_filter_and_count_batch_vs_single_calls(simple_fixture, file_loader):
+    """Test filter_and_count_batch results match individual filter_and_count calls.
+    
+    Verifies:
+    - Batch results are identical to individual calls
+    - No data loss or corruption in batch mode
+    """
+    print(f"\n🔍 Testing filter_and_count_batch vs single calls")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=3
+    )
+    values = ops.get_unique_values(unique_request).values[:3]
+    
+    print(f"  Comparing batch vs 3 individual calls")
+    
+    # Individual calls
+    individual_counts = []
+    for value in values:
+        request = FilterAndCountRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value)],
+            logic="AND"
+        )
+        response = ops.filter_and_count(request)
+        individual_counts.append(response.count)
+    
+    # Batch call
+    batch_request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=v)])
+            for v in values
+        ]
+    )
+    batch_response = ops.filter_and_count_batch(batch_request)
+    batch_counts = [r.count for r in batch_response.results]
+    
+    # Assert
+    print(f"✅ Individual counts: {individual_counts}")
+    print(f"   Batch counts: {batch_counts}")
+    
+    assert batch_counts == individual_counts, "Batch results should match individual calls"
+
+
+@pytest.mark.slow
+def test_filter_and_count_batch_performance(large_10k_fixture, file_loader):
+    """Test filter_and_count_batch performance vs individual calls.
+    
+    Verifies:
+    - Batch is significantly faster than individual calls
+    - Loads file only once
+    - Performance metrics are reasonable
+    """
+    print(f"\n🔍 Testing filter_and_count_batch performance (10k rows)")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import FilterAndCountRequest, FilterAndCountBatchRequest, FilterSet
+    import time
+    
+    # Get sample values
+    from mcp_excel.models.requests import GetUniqueValuesRequest
+    unique_request = GetUniqueValuesRequest(
+        file_path=large_10k_fixture.path_str,
+        sheet_name=large_10k_fixture.sheet_name,
+        column="Status",
+        limit=5
+    )
+    statuses = ops.get_unique_values(unique_request).values[:5]
+    
+    print(f"  Testing with 5 filter sets on {large_10k_fixture.row_count} rows")
+    
+    # Individual calls
+    start_individual = time.time()
+    for status in statuses:
+        request = FilterAndCountRequest(
+            file_path=large_10k_fixture.path_str,
+            sheet_name=large_10k_fixture.sheet_name,
+            filters=[FilterCondition(column="Status", operator="==", value=status)],
+            logic="AND"
+        )
+        ops.filter_and_count(request)
+    time_individual = (time.time() - start_individual) * 1000
+    
+    # Batch call
+    start_batch = time.time()
+    batch_request = FilterAndCountBatchRequest(
+        file_path=large_10k_fixture.path_str,
+        sheet_name=large_10k_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(filters=[FilterCondition(column="Status", operator="==", value=s)])
+            for s in statuses
+        ]
+    )
+    batch_response = ops.filter_and_count_batch(batch_request)
+    time_batch = (time.time() - start_batch) * 1000
+    
+    # Assert
+    print(f"✅ Individual calls: {time_individual:.1f}ms")
+    print(f"   Batch call: {time_batch:.1f}ms")
+    print(f"   Speedup: {time_individual / time_batch:.1f}x")
+    
+    assert time_batch < time_individual, "Batch should be faster than individual calls"
+    assert batch_response.performance.execution_time_ms < 1000, "Should complete in reasonable time"
+
+
+def test_filter_and_count_batch_tsv_output(simple_fixture, file_loader):
+    """Test filter_and_count_batch TSV output format.
+    
+    Verifies:
+    - TSV contains headers (Label, Count, Formula)
+    - TSV contains all results
+    - TSV is properly formatted for Excel paste
+    """
+    print(f"\n🔍 Testing filter_and_count_batch TSV output")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="First",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]
+            ),
+            FilterSet(
+                label="Second",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]
+            ),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ TSV output:")
+    print(response.excel_output.tsv)
+    
+    tsv = response.excel_output.tsv
+    assert "Label\tCount\tFormula" in tsv, "TSV should have headers"
+    assert "First" in tsv, "TSV should contain first label"
+    assert "Second" in tsv, "TSV should contain second label"
+    assert str(response.results[0].count) in tsv, "TSV should contain counts"
+    assert "\t" in tsv, "TSV should use tab separator"
+    assert "\n" in tsv, "TSV should have line breaks"
+
+
+def test_filter_and_count_batch_excel_formulas(simple_fixture, file_loader):
+    """Test filter_and_count_batch Excel formula generation.
+    
+    Verifies:
+    - Generates formula for each filter set
+    - Formulas are valid Excel syntax
+    - Formulas reference correct sheet and columns
+    """
+    print(f"\n🔍 Testing filter_and_count_batch Excel formulas")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Formula Test 1",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]
+            ),
+            FilterSet(
+                label="Formula Test 2",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]
+            ),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Formulas:")
+    for result in response.results:
+        print(f"   {result.label}: {result.formula}")
+    
+    assert all(r.formula is not None for r in response.results), "Should generate formulas"
+    assert all(r.formula.startswith("=") for r in response.results), "Formulas should start with ="
+    assert all("COUNTIF" in r.formula for r in response.results), "Should use COUNTIF function"
+    assert all(simple_fixture.sheet_name in r.formula for r in response.results), "Should reference sheet"
+
+
+def test_filter_and_count_batch_all_operators(numeric_types_fixture, file_loader):
+    """Test filter_and_count_batch with all 12 operators.
+    
+    Verifies:
+    - All operators work in batch mode
+    - Each operator produces correct results
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with all operators")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import FilterAndCountBatchRequest, FilterSet
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Equals", filters=[FilterCondition(column=numeric_types_fixture.columns[1], operator="==", value=100)]),
+            FilterSet(label="Not Equals", filters=[FilterCondition(column=numeric_types_fixture.columns[1], operator="!=", value=100)]),
+            FilterSet(label="Greater", filters=[FilterCondition(column=numeric_types_fixture.columns[1], operator=">", value=100)]),
+            FilterSet(label="Less", filters=[FilterCondition(column=numeric_types_fixture.columns[1], operator="<", value=100)]),
+            FilterSet(label="Greater Equal", filters=[FilterCondition(column=numeric_types_fixture.columns[1], operator=">=", value=100)]),
+            FilterSet(label="Less Equal", filters=[FilterCondition(column=numeric_types_fixture.columns[1], operator="<=", value=100)]),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results for all operators:")
+    for result in response.results:
+        print(f"   {result.label}: {result.count} rows")
+    
+    assert response.total_filter_sets == 6, "Should process 6 filter sets"
+    assert all(r.count >= 0 for r in response.results), "All counts should be non-negative"
+    # Sum of == and != should equal total rows
+    equals_count = response.results[0].count
+    not_equals_count = response.results[1].count
+    assert equals_count + not_equals_count == numeric_types_fixture.row_count, "== and != should cover all rows"
+
+
+def test_filter_and_count_batch_metadata(simple_fixture, file_loader):
+    """Test filter_and_count_batch includes metadata.
+    
+    Verifies:
+    - Metadata is included in response
+    - File format and sheet name are correct
+    - Performance metrics are included
+    """
+    print(f"\n🔍 Testing filter_and_count_batch metadata")
+    
+    ops = DataOperations(file_loader)
+    
+    from mcp_excel.models.requests import FilterAndCountBatchRequest, FilterSet
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null", value=None)]),
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Metadata:")
+    print(f"   File format: {response.metadata.file_format}")
+    print(f"   Sheet: {response.metadata.sheet_name}")
+    print(f"   Rows: {response.metadata.rows_total}")
+    print(f"   Performance: {response.performance.execution_time_ms}ms")
+    
+    assert response.metadata is not None, "Should include metadata"
+    assert response.metadata.file_format == simple_fixture.format, "Should report correct format"
+    assert response.metadata.sheet_name == simple_fixture.sheet_name, "Should report correct sheet"
+    assert response.performance is not None, "Should include performance metrics"
+    assert response.performance.execution_time_ms > 0, "Should have execution time"

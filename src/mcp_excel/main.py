@@ -23,6 +23,7 @@ from .models.requests import (
     CompareSheetsRequest,
     CorrelateRequest,
     DetectOutliersRequest,
+    FilterAndCountBatchRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
     FindColumnRequest,
@@ -300,6 +301,71 @@ class MCPExcelServer:
                             },
                         },
                         "required": ["file_path", "sheet_name", "filters"],
+                    },
+                ),
+                Tool(
+                    name="filter_and_count_batch",
+                    description="Count rows for multiple filter sets in a single call. Optimized for classification and segmentation tasks. Much faster than multiple filter_and_count calls when you need to count rows for several different conditions.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "filter_sets": {
+                                "type": "array",
+                                "description": "List of filter sets to evaluate independently. Each set is processed separately and returns its own count.",
+                                "minItems": 1,
+                                "maxItems": 50,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {
+                                            "type": "string",
+                                            "description": "Optional label for this filter set (e.g., 'Category A', 'Active items'). If not provided, will be labeled as 'Set 1', 'Set 2', etc."
+                                        },
+                                        "filters": {
+                                            "type": "array",
+                                            "description": "Filter conditions for this set",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "column": {"type": "string"},
+                                                    "operator": {
+                                                        "type": "string",
+                                                        "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                                        "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
+                                                    },
+                                                    "value": {"description": "Value for single-value operators"},
+                                                    "values": {
+                                                        "type": "array",
+                                                        "description": "Values for 'in' and 'not_in' operators"
+                                                    }
+                                                },
+                                                "required": ["column", "operator"]
+                                            }
+                                        },
+                                        "logic": {
+                                            "type": "string",
+                                            "enum": ["AND", "OR"],
+                                            "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Default: 'AND'.",
+                                            "default": "AND"
+                                        }
+                                    },
+                                    "required": ["filters"]
+                                }
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "required": ["file_path", "sheet_name", "filter_sets"],
                     },
                 ),
                 Tool(
@@ -1103,6 +1169,11 @@ class MCPExcelServer:
                 elif name == "filter_and_count":
                     request = FilterAndCountRequest(**arguments)
                     response = self.data_ops.filter_and_count(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "filter_and_count_batch":
+                    request = FilterAndCountBatchRequest(**arguments)
+                    response = self.data_ops.filter_and_count_batch(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 elif name == "filter_and_get_rows":

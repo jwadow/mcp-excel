@@ -137,7 +137,7 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 
 **Important:** Replace `C:/Users/YourName/Documents/data.xlsx` with the actual path to your Excel file.
 
-## Available Tools (23)
+## Available Tools (24)
 
 ### `inspect_file`
 
@@ -312,6 +312,50 @@ Count rows matching filter conditions.
 - Applied filters
 
 **Supported operators:** `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`, `not_in`, `contains`, `startswith`, `endswith`, `regex`, `is_null`, `is_not_null`
+
+</details>
+
+### `filter_and_count_batch`
+
+Count rows for multiple filter sets in a single call. Optimized for classification and segmentation tasks.
+
+<details>
+<summary>View Input/Output</summary>
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "filter_sets": [
+    {
+      "label": "Category A",
+      "filters": [
+        {"column": "Category", "operator": "==", "value": "A"}
+      ]
+    },
+    {
+      "label": "Category B",
+      "filters": [
+        {"column": "Category", "operator": "==", "value": "B"}
+      ]
+    },
+    {
+      "label": "High Value",
+      "filters": [
+        {"column": "Amount", "operator": ">", "value": 1000}
+      ]
+    }
+  ]
+}
+```
+
+**Output:**
+- Results for each filter set with count and formula
+- TSV table with all results for copy-paste to Excel
+- Performance metrics
+
+**Use case:** Much faster than multiple `filter_and_count` calls when you need to classify data into multiple categories. Loads file once, applies all filter sets, returns all counts in a single response.
 
 </details>
 

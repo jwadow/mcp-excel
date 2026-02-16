@@ -269,6 +269,23 @@ class CalculateExpressionRequest(BaseModel):
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
 
 
+class FilterSet(BaseModel):
+    """Single set of filters with optional label."""
+
+    label: Optional[str] = Field(default=None, description="Optional label for this filter set")
+    filters: list[FilterCondition] = Field(description="List of filter conditions for this set")
+    logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for combining filters in this set")
+
+
+class FilterAndCountBatchRequest(BaseModel):
+    """Request to count rows for multiple filter sets in a single call."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    filter_sets: list[FilterSet] = Field(description="List of filter sets to evaluate independently", min_length=1, max_length=50)
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
 class GetDataProfileRequest(BaseModel):
     """Request to get data profile for columns."""
 

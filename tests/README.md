@@ -464,7 +464,7 @@ git commit -m "test: add my_new_fixture for [feature]"
 **Priority 2: Operations (Integration Tests)**
 - `tests/integration/test_file_inspection.py` - ✅ DONE (47 tests) - inspect_file, get_sheet_info, get_column_names, get_data_profile
 - `tests/integration/test_data_retrieval.py` - ✅ DONE (48 tests) - get_unique_values, get_value_counts, filter_and_get_rows
-- `tests/integration/test_filtering_and_counting.py` - ✅ DONE (26 tests) - filter_and_count with ALL 12 operators, combined filters (AND/OR), datetime filtering, edge cases
+- `tests/integration/test_filtering_and_counting.py` - ✅ DONE (37 tests) - filter_and_count with ALL 12 operators, combined filters (AND/OR), datetime filtering, edge cases, filter_and_count_batch
 - `tests/integration/test_aggregation.py` - ✅ DONE (28 tests) - aggregate (8 operations: sum, mean, median, min, max, std, var, count), group_by with single/multiple columns, filters, edge cases
 - `tests/integration/test_statistics.py` - ✅ DONE (30 tests) - get_column_stats, correlate (pearson/spearman), detect_outliers (IQR/Z-score), text-to-numeric conversion, filters, edge cases
 - `tests/integration/test_validation.py` - ✅ DONE (24 tests) - find_duplicates (single/multiple columns, row indices, TSV output), find_nulls (null statistics, percentage calculation, indices limit)

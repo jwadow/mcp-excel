@@ -14,6 +14,7 @@ from ..excel.formula_generator import FormulaGenerator
 from ..excel.tsv_formatter import TSVFormatter
 from ..models.requests import (
     AggregateRequest,
+    FilterAndCountBatchRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
     GetUniqueValuesRequest,
@@ -23,8 +24,10 @@ from ..models.requests import (
 from ..models.responses import (
     AggregateResponse,
     ExcelOutput,
+    FilterAndCountBatchResponse,
     FilterAndCountResponse,
     FilterAndGetRowsResponse,
+    FilterSetResult,
     GetUniqueValuesResponse,
     GetValueCountsResponse,
     GroupByResponse,
@@ -622,6 +625,116 @@ class DataOperations(BaseOperations):
             response,
             rows_count=len(groups),
             columns_count=len(grouped_df.columns)
+        )
+
+        return response
+
+    def filter_and_count_batch(
+        self, request: FilterAndCountBatchRequest
+    ) -> FilterAndCountBatchResponse:
+        """Count rows for multiple filter sets in a single call.
+
+        Args:
+            request: Batch filter and count request
+
+        Returns:
+            Batch filter and count response
+        """
+        start_time = time.time()
+
+        # Load DataFrame ONCE
+        df, _ = self._load_with_header_detection(
+            request.file_path, request.sheet_name, request.header_row
+        )
+
+        # Validate ALL filter sets BEFORE execution
+        for i, filter_set in enumerate(request.filter_sets):
+            is_valid, error_msg = self._filter_engine.validate_filters(
+                df, filter_set.filters
+            )
+            if not is_valid:
+                label = filter_set.label or f"Set {i+1}"
+                raise ValueError(f"Filter set '{label}': {error_msg}")
+
+        # Execute all filter sets
+        results = []
+        for i, filter_set in enumerate(request.filter_sets):
+            # Count filtered rows
+            count = self._filter_engine.count_filtered(
+                df, filter_set.filters, filter_set.logic
+            )
+
+            # Serialize filters for response
+            filters_applied = [
+                {
+                    "column": f.column,
+                    "operator": f.operator,
+                    "value": f.value,
+                    "values": f.values,
+                }
+                for f in filter_set.filters
+            ]
+
+            # Generate Excel formula
+            formula_gen = FormulaGenerator(request.sheet_name)
+            column_types = self._get_column_types(df)
+            column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
+
+            column_ranges = {}
+            for filter_cond in filter_set.filters:
+                col_idx = column_indices.get(filter_cond.column)
+                if col_idx is not None:
+                    column_ranges[filter_cond.column] = formula_gen._get_column_range(
+                        filter_cond.column, col_idx
+                    )
+
+            formula = formula_gen.generate_from_filter(
+                operation="count",
+                filters=filter_set.filters,
+                column_ranges=column_ranges,
+                column_types=column_types,
+            )
+
+            results.append(FilterSetResult(
+                label=filter_set.label,
+                count=count,
+                filters_applied=filters_applied,
+                formula=formula
+            ))
+
+        # Generate TSV output
+        headers = ["Label", "Count", "Formula"]
+        rows = [
+            [r.label or f"Set {i+1}", r.count, r.formula or ""]
+            for i, r in enumerate(results)
+        ]
+        tsv = self._tsv_formatter.format_table(headers, rows)
+
+        excel_output = ExcelOutput(
+            tsv=tsv,
+            formula=None,
+            references=None
+        )
+
+        metadata = self._get_file_metadata(request.file_path, request.sheet_name)
+        metadata.rows_total = len(df)
+        metadata.columns_total = len(df.columns)
+
+        performance = self._get_performance_metrics(start_time, len(df), True)
+
+        response = FilterAndCountBatchResponse(
+            results=results,
+            total_filter_sets=len(results),
+            excel_output=excel_output,
+            metadata=metadata,
+            performance=performance,
+        )
+
+        # CONTEXT OVERFLOW PROTECTION: Validate response size
+        self._validate_response_size(
+            response,
+            rows_count=len(results),
+            columns_count=3
         )
 
         return response
