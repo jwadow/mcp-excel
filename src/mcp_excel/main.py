@@ -153,7 +153,26 @@ FILTER_GROUP_SCHEMA = {
     "required": ["filters"]
 }
 
-# Main filter schema - accepts both FilterCondition and FilterGroup
+# Filter property schema - for use in inputSchema properties (without definitions)
+# This is the structure for the "filters" property itself
+FILTER_PROPERTY_SCHEMA = {
+    "type": "array",
+    "description": "List of filter conditions or nested groups. Supports complex logical expressions like (A AND B) OR C.",
+    "items": {
+        "oneOf": [
+            FILTER_CONDITION_SCHEMA,
+            {"$ref": "#/definitions/FilterGroup"}
+        ]
+    }
+}
+
+# Filter definitions - must be placed at root level of inputSchema
+# This enables recursive $ref resolution for nested FilterGroup structures
+FILTER_DEFINITIONS = {
+    "FilterGroup": FILTER_GROUP_SCHEMA
+}
+
+# Legacy: Keep FILTER_SCHEMA for backward compatibility (if needed elsewhere)
 FILTER_SCHEMA = {
     "type": "array",
     "description": "List of filter conditions or nested groups. Supports complex logical expressions like (A AND B) OR C.",
@@ -382,7 +401,7 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Name of the sheet",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -394,6 +413,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "filters"],
                     },
                 ),
@@ -423,7 +443,7 @@ class MCPExcelServer:
                                             "type": "string",
                                             "description": "Optional label for this filter set (e.g., 'Category A', 'Active items'). If not provided, will be labeled as 'Set 1', 'Set 2', etc."
                                         },
-                                        "filters": FILTER_SCHEMA,
+                                        "filters": FILTER_PROPERTY_SCHEMA,
                                         "logic": {
                                             "type": "string",
                                             "enum": ["AND", "OR"],
@@ -439,6 +459,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "filter_sets"],
                     },
                 ),
@@ -456,7 +477,7 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Name of the sheet",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "columns": {
                                 "type": "array",
                                 "items": {"type": "string"},
@@ -483,6 +504,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "filters"],
                     },
                 ),
@@ -509,7 +531,7 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Column to aggregate (must be numeric for sum/mean/median/min/max/std/var)",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -521,6 +543,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "operation", "target_column"],
                     },
                 ),
@@ -552,7 +575,7 @@ class MCPExcelServer:
                                 "enum": ["sum", "mean", "median", "min", "max", "std", "var", "count"],
                                 "description": "Aggregation operation: sum (total), mean (average), median (middle value), min (minimum), max (maximum), std (standard deviation), var (variance), count (row count)",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -564,6 +587,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "group_columns", "agg_column", "agg_operation"],
                     },
                 ),
@@ -585,7 +609,7 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Column name to analyze (should be numeric for meaningful statistics)",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -597,6 +621,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "column"],
                     },
                 ),
@@ -625,7 +650,7 @@ class MCPExcelServer:
                                 "description": "Correlation method: pearson (linear relationships), spearman (rank-based, handles outliers), kendall (rank-based, more robust). Default: pearson",
                                 "default": "pearson",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -637,6 +662,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "columns"],
                     },
                 ),
@@ -814,7 +840,7 @@ class MCPExcelServer:
                                 "enum": ["month", "quarter", "year"],
                                 "description": "Period type for grouping: month (monthly comparison), quarter (quarterly comparison), year (yearly comparison)",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -826,6 +852,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "date_column", "value_column", "period_type"],
                     },
                 ),
@@ -856,7 +883,7 @@ class MCPExcelServer:
                                 "items": {"type": "string"},
                                 "description": "Optional columns to group by (running total resets within each group). Example: [Region] calculates running total per region.",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -868,6 +895,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "order_column", "value_column"],
                     },
                 ),
@@ -897,7 +925,7 @@ class MCPExcelServer:
                                 "type": "integer",
                                 "description": "Number of periods for moving average window (e.g., 7 for 7-day average, 30 for 30-day average)",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -909,6 +937,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "order_column", "value_column", "window_size"],
                     },
                 ),
@@ -945,7 +974,7 @@ class MCPExcelServer:
                                 "items": {"type": "string"},
                                 "description": "Optional columns to group by (ranking resets within each group). Example: [Region] ranks within each region separately.",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -957,6 +986,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "rank_column"],
                     },
                 ),
@@ -982,7 +1012,7 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Name for the calculated column (e.g., 'Total', 'Margin', 'Profit')",
                             },
-                            "filters": FILTER_SCHEMA,
+                            "filters": FILTER_PROPERTY_SCHEMA,
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -994,6 +1024,7 @@ class MCPExcelServer:
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
                         },
+                        "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "expression", "output_column_name"],
                     },
                 ),
