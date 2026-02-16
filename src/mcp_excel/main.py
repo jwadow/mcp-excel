@@ -60,27 +60,7 @@ logger = logging.getLogger("mcp_excel")
 
 OPERATOR_DESCRIPTION = """Comparison operator for filtering data.
 
-COMPARISON OPERATORS (numeric & string):
-- == (equals): exact match
-- != (not equals): exclude exact match
-- > (greater than): numeric comparison
-- < (less than): numeric comparison
-- >= (greater or equal): numeric comparison
-- <= (less or equal): numeric comparison
-
-SET OPERATORS (multiple values):
-- in: value is in list (like Excel filter checkboxes)
-- not_in: value is NOT in list (exclude multiple values)
-
-STRING OPERATORS (text matching):
-- contains: substring search (case-sensitive)
-- startswith: match beginning of string
-- endswith: match end of string
-- regex: regular expression pattern matching
-
-NULL OPERATORS (empty cell handling):
-- is_null: ONLY matches truly empty cells (NaN/None)
-- is_not_null: matches ANY non-empty value
+OPERATORS: ==, !=, >, <, >=, <= (comparison) | in, not_in (set) | contains, startswith, endswith, regex (string) | is_null, is_not_null (null check)
 
 CRITICAL - NULL vs PLACEHOLDER DISTINCTION:
 - is_null: detects ONLY real empty cells (NaN/None in pandas)
@@ -92,23 +72,16 @@ CRITICAL - NULL vs PLACEHOLDER DISTINCTION:
 USAGE PATTERNS:
 - Single value: {"column": "Age", "operator": ">", "value": 30}
 - Multiple values: {"column": "Status", "operator": "in", "values": ["Active", "Pending"]}
-- Text search: {"column": "Name", "operator": "contains", "value": "John"}
-- Null check: {"column": "Email", "operator": "is_null"}
-- Exclude nulls: {"column": "Email", "operator": "is_not_null"}
-- Placeholder filter: {"column": "Notes", "operator": "==", "value": "."}
-- Exclude placeholders: {"column": "Notes", "operator": "not_in", "values": [".", "-"]}
-- Pattern match: {"column": "Code", "operator": "regex", "value": "^[A-Z]{3}[0-9]{3}$"}"""
+- Null check: {"column": "Email", "operator": "is_null"}"""
 
 LOGIC_DESCRIPTION = """Logic operator for combining multiple filters.
 
-AND (intersection): ALL conditions must be true. Returns rows matching EVERY filter.
-- Use for: narrowing results, finding rows that satisfy multiple criteria
-- Example: Age > 30 AND Status = "Active" → only rows with BOTH conditions
+AND: ALL conditions must be true (intersection)
+OR: AT LEAST ONE condition must be true (union)
 
-OR (union): AT LEAST ONE condition must be true. Returns rows matching ANY filter.
-- Use for: broadening results, finding rows that match any of several criteria
-- Example: Status = "Active" OR Status = "Pending" → rows with EITHER status
-- Note: If all OR conditions are on same column, consider using "in" operator instead
+NUMERICAL EXAMPLE:
+Dataset: 100 rows | Filter A: 30 rows | Filter B: 20 rows | Overlap: 5 rows
+→ AND returns 5 rows (intersection) | OR returns 45 rows (30+20-5, union)
 
 COMMON PATTERNS:
 - Classification: Use multiple filter_and_count calls with different filters
@@ -395,7 +368,7 @@ class MCPExcelServer:
                                             "type": "string",
                                             "description": "Optional label for this filter set (e.g., 'Category A', 'Active items'). If not provided, will be labeled as 'Set 1', 'Set 2', etc."
                                         },
-                                        "filters": FILTER_SCHEMA["items"],
+                                        "filters": FILTER_SCHEMA,
                                         "logic": {
                                             "type": "string",
                                             "enum": ["AND", "OR"],
