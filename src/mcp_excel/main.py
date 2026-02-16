@@ -276,7 +276,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -290,7 +291,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -324,7 +325,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -353,7 +355,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -396,7 +398,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -410,7 +413,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -458,7 +461,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -472,7 +476,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -510,7 +514,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -524,7 +529,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -569,7 +574,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -583,7 +589,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -777,7 +783,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -791,7 +798,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -838,7 +845,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -852,7 +860,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -898,7 +906,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -912,7 +921,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -965,7 +974,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -979,7 +989,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
@@ -1021,7 +1031,8 @@ class MCPExcelServer:
                                         "column": {"type": "string"},
                                         "operator": {
                                             "type": "string",
-                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"]
+                                            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in", "contains", "startswith", "endswith", "regex", "is_null", "is_not_null"],
+                                            "description": "Comparison operator. Comparison: ==, !=, >, <, >=, <=. Set: in (value in list), not_in (value not in list). String: contains, startswith, endswith, regex. Null: is_null (empty cell), is_not_null (any non-empty value including '.', '-', spaces). Note: Placeholders like '.', '-' are treated as regular strings, not null."
                                         },
                                         "value": {"description": "Value for single-value operators"},
                                         "values": {
@@ -1035,7 +1046,7 @@ class MCPExcelServer:
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
-                                "description": "Logic operator for combining multiple filters. 'AND' means all filters must match (intersection). 'OR' means at least one filter must match (union). Default: 'AND'. Note: Complex nested logic like '(A AND B) OR C' is not supported in a single call - use multiple calls and combine results in your analysis.",
+                                "description": "Logic operator for combining filters. 'AND' = all conditions must be true (intersection). 'OR' = at least one condition must be true (union). Supports complex logic across different columns. Default: 'AND'.",
                                 "default": "AND",
                             },
                             "header_row": {
