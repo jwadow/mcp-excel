@@ -76,39 +76,31 @@ class TimeSeriesOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate columns
-        if request.date_column not in df.columns:
-            raise ValueError(
-                f"Date column '{request.date_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
-        if request.value_column not in df.columns:
-            raise ValueError(
-                f"Value column '{request.value_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
+        # Find columns using normalized matching
+        actual_date_column = self._find_column(df, request.date_column, context="calculate_period_change")
+        actual_value_column = self._find_column(df, request.value_column, context="calculate_period_change")
 
         # Apply filters
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
         # Ensure date column is datetime
-        if not pd.api.types.is_datetime64_any_dtype(df[request.date_column]):
-            df[request.date_column] = pd.to_datetime(df[request.date_column], errors='coerce')
+        if not pd.api.types.is_datetime64_any_dtype(df[actual_date_column]):
+            df[actual_date_column] = pd.to_datetime(df[actual_date_column], errors='coerce')
 
         # Convert value column to numeric
-        value_col = pd.to_numeric(df[request.value_column], errors='coerce')
+        value_col = pd.to_numeric(df[actual_value_column], errors='coerce')
 
         # Group by period
         if request.period_type == "month":
-            df['period'] = df[request.date_column].dt.to_period('M')
+            df['period'] = df[actual_date_column].dt.to_period('M')
         elif request.period_type == "quarter":
-            df['period'] = df[request.date_column].dt.to_period('Q')
+            df['period'] = df[actual_date_column].dt.to_period('Q')
         elif request.period_type == "year":
-            df['period'] = df[request.date_column].dt.to_period('Y')
+            df['period'] = df[actual_date_column].dt.to_period('Y')
 
         # Aggregate by period
-        period_data = df.groupby('period')[request.value_column].agg(
+        period_data = df.groupby('period')[actual_value_column].agg(
             lambda x: pd.to_numeric(x, errors='coerce').sum()
         ).reset_index()
         period_data.columns = ['period', 'value']
@@ -171,40 +163,37 @@ class TimeSeriesOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate columns
-        if request.order_column not in df.columns:
-            raise ValueError(
-                f"Order column '{request.order_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
-        if request.value_column not in df.columns:
-            raise ValueError(
-                f"Value column '{request.value_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
+        # Find columns using normalized matching
+        actual_order_column = self._find_column(df, request.order_column, context="calculate_running_total")
+        actual_value_column = self._find_column(df, request.value_column, context="calculate_running_total")
 
         # Apply filters
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
+        # Normalize group_by_columns if provided
+        actual_group_by_columns = None
+        if request.group_by_columns:
+            actual_group_by_columns = self._find_columns(df, request.group_by_columns, context="calculate_running_total")
+
         # Convert value column to numeric
-        df[request.value_column] = pd.to_numeric(df[request.value_column], errors='coerce')
+        df[actual_value_column] = pd.to_numeric(df[actual_value_column], errors='coerce')
 
         # Sort by order column
-        df = df.sort_values(by=request.order_column)
+        df = df.sort_values(by=actual_order_column)
 
         # Calculate running total
-        if request.group_by_columns:
+        if actual_group_by_columns:
             # Running total within groups
-            df['running_total'] = df.groupby(request.group_by_columns)[request.value_column].cumsum()
+            df['running_total'] = df.groupby(actual_group_by_columns)[actual_value_column].cumsum()
         else:
             # Overall running total
-            df['running_total'] = df[request.value_column].cumsum()
+            df['running_total'] = df[actual_value_column].cumsum()
 
         # Format results
-        result_columns = [request.order_column, request.value_column, 'running_total']
-        if request.group_by_columns:
-            result_columns = request.group_by_columns + result_columns
+        result_columns = [actual_order_column, actual_value_column, 'running_total']
+        if actual_group_by_columns:
+            result_columns = actual_group_by_columns + result_columns
 
         rows = []
         for _, row in df.iterrows():
@@ -265,35 +254,27 @@ class TimeSeriesOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate columns
-        if request.order_column not in df.columns:
-            raise ValueError(
-                f"Order column '{request.order_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
-        if request.value_column not in df.columns:
-            raise ValueError(
-                f"Value column '{request.value_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
+        # Find columns using normalized matching
+        actual_order_column = self._find_column(df, request.order_column, context="calculate_moving_average")
+        actual_value_column = self._find_column(df, request.value_column, context="calculate_moving_average")
 
         # Apply filters
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
         # Convert value column to numeric
-        df[request.value_column] = pd.to_numeric(df[request.value_column], errors='coerce')
+        df[actual_value_column] = pd.to_numeric(df[actual_value_column], errors='coerce')
 
         # Sort by order column
-        df = df.sort_values(by=request.order_column)
+        df = df.sort_values(by=actual_order_column)
 
         # Calculate moving average
-        df['moving_average'] = df[request.value_column].rolling(
+        df['moving_average'] = df[actual_value_column].rolling(
             window=request.window_size, min_periods=1
         ).mean()
 
         # Format results
-        result_columns = [request.order_column, request.value_column, 'moving_average']
+        result_columns = [actual_order_column, actual_value_column, 'moving_average']
         rows = []
         for _, row in df.iterrows():
             row_dict = {}

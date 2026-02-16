@@ -559,3 +559,442 @@ def test_ensure_numeric_column_all_nulls(file_loader):
     
     assert pd.api.types.is_numeric_dtype(result), "Should be numeric dtype"
     assert result.isna().all(), "All values should be NaN"
+
+
+# ============================================================================
+# Test Unicode Normalization (Column Name Matching)
+# ============================================================================
+
+def test_normalize_column_name_nfc_nfd(file_loader):
+    """Test _normalize_column_name with NFC vs NFD Unicode forms.
+    
+    Verifies:
+    - NFC and NFD forms normalize to same result
+    - Result is in NFC form
+    - Handles composed vs decomposed characters
+    """
+    print("\n🔤 Testing Unicode normalization - NFC vs NFD")
+    
+    import unicodedata
+    ops = BaseOperations(file_loader)
+    
+    cafe_nfc = "café"  # NFC (composed)
+    cafe_nfd = unicodedata.normalize('NFD', "café")  # NFD (decomposed)
+    
+    normalized_nfc = ops._normalize_column_name(cafe_nfc)
+    normalized_nfd = ops._normalize_column_name(cafe_nfd)
+    
+    print(f"  NFC input: {repr(cafe_nfc)} → {repr(normalized_nfc)}")
+    print(f"  NFD input: {repr(cafe_nfd)} → {repr(normalized_nfd)}")
+    
+    assert normalized_nfc == normalized_nfd, "NFC and NFD should normalize to same result"
+    assert normalized_nfc == "café", "Should normalize to NFC form"
+    assert unicodedata.is_normalized('NFC', normalized_nfc), "Result should be in NFC form"
+
+
+def test_normalize_column_name_nonbreaking_space(file_loader):
+    """Test _normalize_column_name with non-breaking spaces.
+    
+    Verifies:
+    - Non-breaking spaces (U+00A0) converted to regular spaces (U+0020)
+    - Regular and non-breaking spaces normalize to same result
+    """
+    print("\n🔤 Testing Unicode normalization - non-breaking space")
+    
+    ops = BaseOperations(file_loader)
+    
+    with_regular = "Нетто, кг"  # Regular space (U+0020)
+    with_nonbreaking = "Нетто,\u00A0кг"  # Non-breaking space (U+00A0)
+    
+    normalized_regular = ops._normalize_column_name(with_regular)
+    normalized_nonbreaking = ops._normalize_column_name(with_nonbreaking)
+    
+    print(f"  Regular space: {repr(with_regular)} → {repr(normalized_regular)}")
+    print(f"  Non-breaking: {repr(with_nonbreaking)} → {repr(normalized_nonbreaking)}")
+    
+    assert normalized_regular == normalized_nonbreaking, "Should normalize to same result"
+    assert "\u00A0" not in normalized_nonbreaking, "Should remove non-breaking spaces"
+    assert " " in normalized_nonbreaking, "Should have regular space"
+
+
+def test_normalize_column_name_whitespace(file_loader):
+    """Test _normalize_column_name with various whitespace issues.
+    
+    Verifies:
+    - Leading/trailing whitespace removed
+    - Multiple consecutive spaces collapsed to one
+    - Tabs and newlines handled
+    """
+    print("\n🔤 Testing Unicode normalization - whitespace")
+    
+    ops = BaseOperations(file_loader)
+    
+    test_cases = [
+        (" Name ", "Name"),
+        ("  Price  ", "Price"),
+        ("Name  Value", "Name Value"),
+        ("\tValue\t", "Value"),
+        ("A    B    C", "A B C"),
+    ]
+    
+    for input_str, expected in test_cases:
+        result = ops._normalize_column_name(input_str)
+        print(f"  {repr(input_str)} → {repr(result)}")
+        assert result == expected, f"Should normalize {repr(input_str)} to {repr(expected)}"
+
+
+def test_normalize_column_name_combined_issues(file_loader):
+    """Test _normalize_column_name with combined Unicode + whitespace.
+    
+    Verifies:
+    - Handles NFC + non-breaking space + whitespace together
+    - All normalizations applied correctly
+    """
+    print("\n🔤 Testing Unicode normalization - combined issues")
+    
+    import unicodedata
+    ops = BaseOperations(file_loader)
+    
+    # NFC + non-breaking space + leading/trailing spaces
+    cafe_nfc = "café"
+    input_str = f" {cafe_nfc}\u00A0bar "
+    
+    result = ops._normalize_column_name(input_str)
+    
+    print(f"  Input: {repr(input_str)}")
+    print(f"  Output: {repr(result)}")
+    
+    assert result == "café bar", "Should handle combined normalization"
+    assert "\u00A0" not in result, "Should remove non-breaking space"
+    assert not result.startswith(" "), "Should remove leading space"
+    assert not result.endswith(" "), "Should remove trailing space"
+
+
+def test_find_column_nfc_vs_nfd(file_loader):
+    """Test _find_column with different Unicode forms.
+    
+    Verifies:
+    - Finds column when request uses NFD but DataFrame has NFC
+    - Returns original column name from DataFrame
+    """
+    print("\n🔍 Testing find_column - NFC vs NFD")
+    
+    import unicodedata
+    ops = BaseOperations(file_loader)
+    
+    # DataFrame has NFC
+    df = pd.DataFrame({"café": [1, 2, 3]})
+    
+    # Request uses NFD
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    
+    actual_column = ops._find_column(df, cafe_nfd, context="test")
+    
+    print(f"  Request (NFD): {repr(cafe_nfd)}")
+    print(f"  Found: {repr(actual_column)}")
+    
+    assert actual_column == "café", "Should find column despite Unicode form difference"
+    assert actual_column in df.columns, "Should return original column name"
+
+
+def test_find_column_nonbreaking_space(file_loader):
+    """Test _find_column with non-breaking space mismatch.
+    
+    Verifies:
+    - Finds column when request has regular space but DataFrame has non-breaking
+    - Returns original column name with non-breaking space
+    """
+    print("\n🔍 Testing find_column - non-breaking space")
+    
+    ops = BaseOperations(file_loader)
+    
+    # DataFrame has non-breaking space
+    df = pd.DataFrame({"Нетто,\u00A0кг": [1, 2, 3]})
+    
+    # Request uses regular space
+    request_with_regular = "Нетто, кг"
+    
+    actual_column = ops._find_column(df, request_with_regular, context="test")
+    
+    print(f"  Request (regular space): {repr(request_with_regular)}")
+    print(f"  Found: {repr(actual_column)}")
+    
+    assert actual_column == "Нетто,\u00A0кг", "Should find column despite space difference"
+    assert "\u00A0" in actual_column, "Should return original with non-breaking space"
+
+
+def test_find_column_whitespace_variations(file_loader):
+    """Test _find_column with whitespace variations.
+    
+    Verifies:
+    - Finds column when whitespace differs
+    - Returns original column name with original whitespace
+    """
+    print("\n🔍 Testing find_column - whitespace variations")
+    
+    ops = BaseOperations(file_loader)
+    
+    # DataFrame has leading/trailing spaces
+    df = pd.DataFrame({" Name ": [1, 2, 3]})
+    
+    # Request without spaces
+    actual_column = ops._find_column(df, "Name", context="test")
+    
+    print(f"  Request: 'Name'")
+    print(f"  Found: {repr(actual_column)}")
+    
+    assert actual_column == " Name ", "Should find column despite whitespace difference"
+
+
+def test_find_column_not_found_with_suggestions(file_loader):
+    """Test _find_column error message with fuzzy suggestions.
+    
+    Verifies:
+    - ValueError raised when column not found
+    - Error message includes fuzzy suggestions
+    - Mentions context in error
+    """
+    print("\n🔍 Testing find_column - not found with suggestions")
+    
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({"café": [1, 2, 3], "Москва": [4, 5, 6]})
+    
+    with pytest.raises(ValueError) as exc_info:
+        ops._find_column(df, "caffe", context="test_operation")
+    
+    error_msg = str(exc_info.value)
+    print(f"  Error message: {error_msg}")
+    
+    assert "not found in test_operation" in error_msg, "Should mention context"
+    assert "Did you mean" in error_msg, "Should provide suggestions"
+    assert "café" in error_msg, "Should suggest similar column"
+
+
+def test_find_column_not_found_no_suggestions(file_loader):
+    """Test _find_column error when no close matches exist.
+    
+    Verifies:
+    - Error message lists available columns
+    - No suggestions when no close matches
+    """
+    print("\n🔍 Testing find_column - not found without suggestions")
+    
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({"café": [1, 2, 3]})
+    
+    with pytest.raises(ValueError) as exc_info:
+        ops._find_column(df, "xyz123", context="test")
+    
+    error_msg = str(exc_info.value)
+    print(f"  Error message: {error_msg}")
+    
+    assert "not found in test" in error_msg, "Should mention context"
+    assert "Available columns" in error_msg, "Should list available columns"
+    assert "Did you mean" not in error_msg, "Should not suggest when no close matches"
+
+
+def test_find_columns_multiple_unicode(file_loader):
+    """Test _find_columns with multiple Unicode columns.
+    
+    Verifies:
+    - Finds all columns with Unicode variations
+    - Returns original column names from DataFrame
+    - Preserves order
+    """
+    print("\n🔍 Testing find_columns - multiple Unicode columns")
+    
+    import unicodedata
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({
+        "café": [1, 2, 3],
+        "Москва": [4, 5, 6],
+        "naïve": [7, 8, 9],
+    })
+    
+    # Request with NFD forms
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    naive_nfd = unicodedata.normalize('NFD', "naïve")
+    
+    actual_columns = ops._find_columns(
+        df,
+        [cafe_nfd, "Москва", naive_nfd],
+        context="test"
+    )
+    
+    print(f"  Found: {actual_columns}")
+    
+    assert len(actual_columns) == 3, "Should find all columns"
+    assert actual_columns == ["café", "Москва", "naïve"], "Should return original names"
+
+
+def test_find_columns_mixed_issues(file_loader):
+    """Test _find_columns with mixed Unicode and whitespace issues.
+    
+    Verifies:
+    - Handles combination of NFC/NFD, spaces, whitespace
+    - Returns all original column names correctly
+    """
+    print("\n🔍 Testing find_columns - mixed issues")
+    
+    import unicodedata
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({
+        "café": [1, 2, 3],
+        " Name ": [4, 5, 6],
+        "Нетто,\u00A0кг": [7, 8, 9],
+    })
+    
+    # Request with different forms
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    
+    actual_columns = ops._find_columns(
+        df,
+        [cafe_nfd, "Name", "Нетто, кг"],  # NFD, no spaces, regular space
+        context="test"
+    )
+    
+    print(f"  Found: {actual_columns}")
+    
+    assert len(actual_columns) == 3, "Should find all columns"
+    assert actual_columns[0] == "café", "Should find NFC from NFD request"
+    assert actual_columns[1] == " Name ", "Should find column with spaces"
+    assert actual_columns[2] == "Нетто,\u00A0кг", "Should find column with non-breaking space"
+
+
+def test_find_columns_one_not_found(file_loader):
+    """Test _find_columns when one column not found.
+    
+    Verifies:
+    - Raises ValueError on first missing column
+    - Error message mentions missing column
+    """
+    print("\n🔍 Testing find_columns - one not found")
+    
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({"café": [1, 2, 3], "Москва": [4, 5, 6]})
+    
+    with pytest.raises(ValueError) as exc_info:
+        ops._find_columns(
+            df,
+            ["café", "NotExist", "Москва"],
+            context="test"
+        )
+    
+    error_msg = str(exc_info.value)
+    print(f"  Error message: {error_msg}")
+    
+    assert "NotExist" in error_msg, "Should mention missing column"
+    assert "not found in test" in error_msg, "Should mention context"
+
+
+def test_find_columns_empty_list(file_loader):
+    """Test _find_columns with empty list.
+    
+    Verifies:
+    - Returns empty list for empty input
+    - No error raised
+    """
+    print("\n🔍 Testing find_columns - empty list")
+    
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({"café": [1, 2, 3]})
+    
+    actual_columns = ops._find_columns(df, [], context="test")
+    
+    print(f"  Found: {actual_columns}")
+    
+    assert actual_columns == [], "Should return empty list"
+
+
+def test_normalize_column_name_cyrillic(file_loader):
+    """Test _normalize_column_name with Cyrillic Unicode.
+    
+    Verifies:
+    - Cyrillic NFC/NFD forms normalize to same result
+    - Result is in NFC form
+    """
+    print("\n🔤 Testing Unicode normalization - Cyrillic")
+    
+    import unicodedata
+    ops = BaseOperations(file_loader)
+    
+    moscow_nfc = "Москва"
+    moscow_nfd = unicodedata.normalize('NFD', moscow_nfc)
+    
+    normalized_nfc = ops._normalize_column_name(moscow_nfc)
+    normalized_nfd = ops._normalize_column_name(moscow_nfd)
+    
+    print(f"  NFC: {repr(moscow_nfc)} → {repr(normalized_nfc)}")
+    print(f"  NFD: {repr(moscow_nfd)} → {repr(normalized_nfd)}")
+    
+    assert normalized_nfc == normalized_nfd, "Cyrillic NFC/NFD should normalize to same"
+    assert unicodedata.is_normalized('NFC', normalized_nfc), "Should be in NFC form"
+
+
+def test_normalize_column_name_empty_string(file_loader):
+    """Test _normalize_column_name with empty string.
+    
+    Verifies:
+    - Empty string returns empty string
+    - No error raised
+    """
+    print("\n🔤 Testing Unicode normalization - empty string")
+    
+    ops = BaseOperations(file_loader)
+    
+    result = ops._normalize_column_name("")
+    
+    print(f"  Result: {repr(result)}")
+    
+    assert result == "", "Should return empty string"
+
+
+def test_normalize_column_name_only_whitespace(file_loader):
+    """Test _normalize_column_name with only whitespace.
+    
+    Verifies:
+    - Whitespace-only strings become empty after normalization
+    - Various whitespace types handled
+    """
+    print("\n🔤 Testing Unicode normalization - only whitespace")
+    
+    ops = BaseOperations(file_loader)
+    
+    test_cases = ["   ", "\t\t", "\n\n", " \t\n "]
+    
+    for input_str in test_cases:
+        result = ops._normalize_column_name(input_str)
+        print(f"  {repr(input_str)} → {repr(result)}")
+        assert result == "", "Should return empty string after stripping"
+
+
+def test_find_column_case_sensitive(file_loader):
+    """Test that _find_column matching is case-sensitive.
+    
+    Verifies:
+    - "Name" and "name" are treated as different columns
+    - Exact case match required
+    """
+    print("\n🔍 Testing find_column - case sensitivity")
+    
+    ops = BaseOperations(file_loader)
+    
+    df = pd.DataFrame({
+        "Name": [1, 2, 3],
+        "name": [4, 5, 6],
+    })
+    
+    actual_upper = ops._find_column(df, "Name", context="test")
+    actual_lower = ops._find_column(df, "name", context="test")
+    
+    print(f"  'Name' → {repr(actual_upper)}")
+    print(f"  'name' → {repr(actual_lower)}")
+    
+    assert actual_upper == "Name", "Should find uppercase version"
+    assert actual_lower == "name", "Should find lowercase version"

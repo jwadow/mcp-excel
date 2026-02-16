@@ -52,19 +52,13 @@ class ValidationOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate columns exist
-        missing_cols = [col for col in request.columns if col not in df.columns]
-        if missing_cols:
-            available = ", ".join(df.columns.tolist())
-            raise ValueError(
-                f"Columns not found: {', '.join(missing_cols)}. "
-                f"Available columns: {available}"
-            )
+        # Find all columns using normalized matching
+        actual_columns = self._find_columns(df, request.columns, context="find_duplicates")
 
         # Find duplicates
         # duplicated() marks all duplicates except the first occurrence
         # keep=False marks all duplicates including first occurrence
-        duplicate_mask = df.duplicated(subset=request.columns, keep=False)
+        duplicate_mask = df.duplicated(subset=actual_columns, keep=False)
         duplicate_df = df[duplicate_mask]
 
         # Convert to list of dicts
@@ -136,20 +130,14 @@ class ValidationOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate columns exist
-        missing_cols = [col for col in request.columns if col not in df.columns]
-        if missing_cols:
-            available = ", ".join(df.columns.tolist())
-            raise ValueError(
-                f"Columns not found: {', '.join(missing_cols)}. "
-                f"Available columns: {available}"
-            )
+        # Find all columns using normalized matching
+        actual_columns = self._find_columns(df, request.columns, context="find_nulls")
 
         # Analyze nulls for each column
         null_info = {}
         total_nulls = 0
 
-        for col in request.columns:
+        for col in actual_columns:
             null_mask = df[col].isna()
             null_count = int(null_mask.sum())
             total_nulls += null_count
@@ -172,7 +160,7 @@ class ValidationOperations(BaseOperations):
         headers = ["Column", "Null Count", "Percentage", "Total Rows"]
         rows = []
 
-        for col in request.columns:
+        for col in actual_columns:
             info = null_info[col]
             rows.append([
                 col,

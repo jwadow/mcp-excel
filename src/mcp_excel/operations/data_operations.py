@@ -94,15 +94,11 @@ class DataOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Check column exists
-        if request.column not in df.columns:
-            available = ", ".join(str(col) for col in df.columns)
-            raise ValueError(
-                f"Column '{request.column}' not found. Available columns: {available}"
-            )
+        # Find column using normalized matching
+        actual_column = self._find_column(df, request.column, context="get_unique_values")
 
         # Get unique values
-        unique_vals = df[request.column].dropna().unique()
+        unique_vals = df[actual_column].dropna().unique()
         
         # Sort for consistency (handle mixed types)
         try:
@@ -147,18 +143,14 @@ class DataOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Check column exists
-        if request.column not in df.columns:
-            available = ", ".join(str(col) for col in df.columns)
-            raise ValueError(
-                f"Column '{request.column}' not found. Available columns: {available}"
-            )
+        # Find column using normalized matching
+        actual_column = self._find_column(df, request.column, context="get_value_counts")
 
         # Get value counts
-        value_counts = df[request.column].value_counts().head(request.top_n)
+        value_counts = df[actual_column].value_counts().head(request.top_n)
         # Format keys to remove .0 from floats, then convert to string
         value_counts_dict = {str(self._format_value(k)): int(v) for k, v in value_counts.items()}
-        total_values = int(df[request.column].count())
+        total_values = int(df[actual_column].count())
 
         # Generate TSV output
         headers = [request.column, "Count"]
@@ -299,15 +291,9 @@ class DataOperations(BaseOperations):
 
         # CONTEXT OVERFLOW PROTECTION: Apply smart column limit
         if request.columns:
-            # Validate requested columns
-            missing_cols = set(request.columns) - set(df.columns)
-            if missing_cols:
-                available = ", ".join(str(col) for col in df.columns)
-                raise ValueError(
-                    f"Columns not found: {', '.join(missing_cols)}. Available: {available}"
-                )
-            filtered_df = filtered_df[request.columns]
-            actual_columns = request.columns
+            # Find requested columns using normalized matching
+            actual_columns = self._find_columns(df, request.columns, context="filter_and_get_rows")
+            filtered_df = filtered_df[actual_columns]
         else:
             # Apply default column limit to prevent context overflow
             filtered_df, actual_columns = self._apply_column_limit(filtered_df, None)
@@ -379,12 +365,8 @@ class DataOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Check target column exists
-        if request.target_column not in df.columns:
-            available = ", ".join(str(col) for col in df.columns)
-            raise ValueError(
-                f"Column '{request.target_column}' not found. Available columns: {available}"
-            )
+        # Find target column using normalized matching
+        actual_target_column = self._find_column(df, request.target_column, context="aggregate")
 
         # Apply filters if provided
         if request.filters:
@@ -394,7 +376,7 @@ class DataOperations(BaseOperations):
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
         # Get column data
-        col_data = df[request.target_column]
+        col_data = df[actual_target_column]
 
         # Try to convert to numeric if it's not already numeric
         # This handles Excel's common issue of storing numbers as text
@@ -529,14 +511,9 @@ class DataOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate columns
-        all_columns = request.group_columns + [request.agg_column]
-        missing_cols = set(all_columns) - set(df.columns)
-        if missing_cols:
-            available = ", ".join(str(col) for col in df.columns)
-            raise ValueError(
-                f"Columns not found: {', '.join(missing_cols)}. Available: {available}"
-            )
+        # Find all columns using normalized matching
+        actual_group_columns = self._find_columns(df, request.group_columns, context="group_by")
+        actual_agg_column = self._find_column(df, request.agg_column, context="group_by")
 
         # Apply filters if provided
         if request.filters:
@@ -550,38 +527,38 @@ class DataOperations(BaseOperations):
         
         # Try to convert aggregation column to numeric if needed (only for numeric operations)
         if operation != "count":
-            if df[request.agg_column].dtype == 'object' or df[request.agg_column].dtype.name == 'string':
-                df[request.agg_column] = pd.to_numeric(df[request.agg_column], errors='coerce')
+            if df[actual_agg_column].dtype == 'object' or df[actual_agg_column].dtype.name == 'string':
+                df[actual_agg_column] = pd.to_numeric(df[actual_agg_column], errors='coerce')
         try:
             if operation == "sum":
-                grouped = df.groupby(request.group_columns)[request.agg_column].sum()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].sum()
             elif operation == "mean":
-                grouped = df.groupby(request.group_columns)[request.agg_column].mean()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].mean()
             elif operation == "median":
-                grouped = df.groupby(request.group_columns)[request.agg_column].median()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].median()
             elif operation == "min":
-                grouped = df.groupby(request.group_columns)[request.agg_column].min()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].min()
             elif operation == "max":
-                grouped = df.groupby(request.group_columns)[request.agg_column].max()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].max()
             elif operation == "std":
-                grouped = df.groupby(request.group_columns)[request.agg_column].std()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].std()
             elif operation == "var":
-                grouped = df.groupby(request.group_columns)[request.agg_column].var()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].var()
             elif operation == "count":
-                grouped = df.groupby(request.group_columns)[request.agg_column].count()
+                grouped = df.groupby(actual_group_columns)[actual_agg_column].count()
             else:
                 raise ValueError(f"Unsupported operation: {operation}")
         except (TypeError, ValueError, KeyError) as e:
             raise ValueError(
-                f"Cannot perform '{operation}' on column '{request.agg_column}' "
-                f"grouped by {request.group_columns}. Column may contain non-numeric data. Error: {e}"
+                f"Cannot perform '{operation}' on column '{actual_agg_column}' "
+                f"grouped by {actual_group_columns}. Column may contain non-numeric data. Error: {e}"
             )
 
         # Convert to list of dicts
         # Use reset_index with name parameter to avoid column name conflicts
         if isinstance(grouped, pd.Series):
             # For Series, specify the name for the aggregation column
-            agg_col_name = f"{request.agg_column}_{operation}"
+            agg_col_name = f"{actual_agg_column}_{operation}"
             grouped_df = grouped.reset_index(name=agg_col_name)
         else:
             # For DataFrame (shouldn't happen with single agg column, but handle it)

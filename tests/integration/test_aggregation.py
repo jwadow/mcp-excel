@@ -1024,3 +1024,184 @@ def test_group_by_tsv_output_format(simple_fixture, file_loader):
     
     # Check TSV has tab separators
     assert "\t" in response.excel_output.tsv, "TSV should use tab separators"
+
+
+# ============================================================================
+# Unicode Normalization Integration Tests
+# ============================================================================
+
+def test_aggregate_with_unicode_nfd_column(simple_fixture, file_loader):
+    """Test aggregate with NFD Unicode form in column name.
+    
+    Verifies:
+    - Finds column when request uses NFD but DataFrame has NFC
+    - Performs aggregation correctly
+    - Unicode normalization works end-to-end
+    """
+    print(f"\n🔤 Testing aggregate with NFD Unicode column name")
+    
+    import unicodedata
+    ops = DataOperations(file_loader)
+    
+    # DataFrame has "Возраст" in NFC form
+    # Request with NFD form (decomposed)
+    column_nfd = unicodedata.normalize('NFD', "Возраст")
+    
+    request = AggregateRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        operation="sum",
+        target_column=column_nfd,  # NFD form
+        filters=[]
+    )
+    
+    # Act
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Sum calculated successfully: {response.value}")
+    print(f"   Column requested (NFD): {repr(column_nfd)}")
+    print(f"   Column found (NFC): {repr(response.target_column)}")
+    
+    assert response.value > 0, "Should calculate sum despite Unicode form difference"
+    assert response.target_column == "Возраст", "Should return original NFC column name"
+
+
+def test_group_by_with_unicode_nfd_columns(simple_fixture, file_loader):
+    """Test group_by with NFD Unicode forms in column names.
+    
+    Verifies:
+    - Finds group columns with NFD form
+    - Finds agg column with NFD form
+    - Returns correct groups
+    """
+    print(f"\n🔤 Testing group_by with NFD Unicode column names")
+    
+    import unicodedata
+    ops = DataOperations(file_loader)
+    
+    # Request with NFD forms
+    group_col_nfd = unicodedata.normalize('NFD', "Город")
+    agg_col_nfd = unicodedata.normalize('NFD', "Возраст")
+    
+    request = GroupByRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        group_columns=[group_col_nfd],  # NFD form
+        agg_column=agg_col_nfd,  # NFD form
+        agg_operation="sum",
+        filters=[]
+    )
+    
+    # Act
+    response = ops.group_by(request)
+    
+    # Assert
+    print(f"✅ Groups found: {len(response.groups)}")
+    print(f"   Group columns: {response.group_columns}")
+    
+    assert len(response.groups) > 0, "Should find groups despite Unicode form difference"
+    assert response.group_columns == ["Город"], "Should return original NFC column names"
+    assert response.agg_column == "Возраст", "Should return original NFC agg column"
+
+
+def test_aggregate_unicode_column_not_found_with_suggestions(simple_fixture, file_loader):
+    """Test aggregate error message with Unicode fuzzy suggestions.
+    
+    Verifies:
+    - Error message provides fuzzy suggestions for Unicode columns
+    - Suggestions work across Unicode forms
+    """
+    print(f"\n🔤 Testing aggregate error with Unicode suggestions")
+    
+    ops = DataOperations(file_loader)
+    
+    # Request with typo in Cyrillic column name
+    request = AggregateRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        operation="sum",
+        target_column="Вазраст",  # Typo: "Вазраст" instead of "Возраст"
+        filters=[]
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        ops.aggregate(request)
+    
+    error_msg = str(exc_info.value)
+    print(f"✅ Error message: {error_msg}")
+    
+    assert "not found" in error_msg, "Should mention column not found"
+    assert "Did you mean" in error_msg, "Should provide fuzzy suggestions"
+    assert "Возраст" in error_msg, "Should suggest correct Cyrillic column"
+
+
+def test_aggregate_with_filter_unicode_nfd(simple_fixture, file_loader):
+    """Test aggregate with filter using NFD Unicode column.
+    
+    Verifies:
+    - Filter engine handles NFD column names
+    - Aggregation works with Unicode-normalized filters
+    - End-to-end Unicode normalization in filtering + aggregation
+    """
+    print(f"\n🔤 Testing aggregate with NFD filter column")
+    
+    import unicodedata
+    ops = DataOperations(file_loader)
+    
+    # Filter and target use NFD forms
+    filter_col_nfd = unicodedata.normalize('NFD', "Возраст")
+    target_col_nfd = unicodedata.normalize('NFD', "Возраст")
+    
+    request = AggregateRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        operation="sum",
+        target_column=target_col_nfd,
+        filters=[
+            FilterCondition(column=filter_col_nfd, operator=">", value=30)
+        ]
+    )
+    
+    # Act
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Filtered sum: {response.value}")
+    print(f"   Filters applied: {len(response.filters_applied)}")
+    
+    assert response.value > 0, "Should calculate filtered sum with NFD columns"
+    assert len(response.filters_applied) == 1, "Should apply filter"
+    assert response.filters_applied[0]["column"] == "Возраст", "Should normalize filter column"
+
+
+def test_group_by_unicode_column_not_found(simple_fixture, file_loader):
+    """Test group_by error with non-existent Unicode column.
+    
+    Verifies:
+    - Error message for Unicode column not found
+    - Provides helpful suggestions
+    """
+    print(f"\n🔤 Testing group_by error with Unicode column")
+    
+    ops = DataOperations(file_loader)
+    
+    request = GroupByRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        group_columns=["Гарод"],  # Typo: "Гарод" instead of "Город"
+        agg_column="Возраст",
+        agg_operation="sum",
+        filters=[]
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        ops.group_by(request)
+    
+    error_msg = str(exc_info.value)
+    print(f"✅ Error message: {error_msg}")
+    
+    assert "not found" in error_msg, "Should mention column not found"
+    assert "Гарод" in error_msg, "Should mention the typo column"

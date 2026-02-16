@@ -59,19 +59,15 @@ class StatisticsOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate column exists
-        if request.column not in df.columns:
-            available = ", ".join(df.columns.tolist())
-            raise ValueError(
-                f"Column '{request.column}' not found. Available columns: {available}"
-            )
+        # Find column using normalized matching
+        actual_column = self._find_column(df, request.column, context="get_column_stats")
 
         # Apply filters if provided
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
         # Get column data
-        col_data = df[request.column]
+        col_data = df[actual_column]
 
         # Ensure column is numeric (with auto-conversion for text-stored numbers)
         col_data = self._ensure_numeric_column(col_data, request.column)
@@ -150,24 +146,18 @@ class StatisticsOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate all columns exist
-        missing_cols = [col for col in request.columns if col not in df.columns]
-        if missing_cols:
-            available = ", ".join(df.columns.tolist())
-            raise ValueError(
-                f"Columns not found: {', '.join(missing_cols)}. "
-                f"Available columns: {available}"
-            )
+        # Find all columns using normalized matching
+        actual_columns = self._find_columns(df, request.columns, context="correlate")
 
         # Apply filters if provided
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
         # Select only requested columns
-        df_subset = df[request.columns].copy()
+        df_subset = df[actual_columns].copy()
 
         # Ensure all columns are numeric (with auto-conversion for text-stored numbers)
-        for col in request.columns:
+        for col in actual_columns:
             df_subset[col] = self._ensure_numeric_column(df_subset[col], col)
 
         # Drop rows with any NaN values
@@ -237,15 +227,11 @@ class StatisticsOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate column exists
-        if request.column not in df.columns:
-            available = ", ".join(df.columns.tolist())
-            raise ValueError(
-                f"Column '{request.column}' not found. Available columns: {available}"
-            )
+        # Find column using normalized matching
+        actual_column = self._find_column(df, request.column, context="detect_outliers")
 
         # Get column data
-        col_data = df[request.column].copy()
+        col_data = df[actual_column].copy()
 
         # Ensure column is numeric (with auto-conversion for text-stored numbers)
         col_data = self._ensure_numeric_column(col_data, request.column)

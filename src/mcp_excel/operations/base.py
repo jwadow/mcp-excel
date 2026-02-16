@@ -6,6 +6,8 @@
 """Base class for all operations with common functionality."""
 
 import time
+import unicodedata
+from difflib import get_close_matches
 from typing import Any
 
 import pandas as pd
@@ -140,6 +142,132 @@ class BaseOperations:
         df.columns = [str(col) for col in df.columns]
 
         return df, detected_row
+
+    def _normalize_column_name(self, name: str) -> str:
+        """Normalize column name for robust matching.
+        
+        Handles:
+        - Unicode normalization (NFC - composed form)
+        - Non-breaking spaces (U+00A0) → regular spaces (U+0020)
+        - Leading/trailing whitespace
+        - Multiple consecutive spaces → single space
+        
+        Args:
+            name: Column name to normalize
+        
+        Returns:
+            Normalized column name
+        
+        Examples:
+            >>> _normalize_column_name("café")  # NFC or NFD
+            "café"  # Always NFC
+            >>> _normalize_column_name("Нетто,\u00A0кг")  # Non-breaking space
+            "Нетто, кг"  # Regular space
+            >>> _normalize_column_name("  Name  ")
+            "Name"
+        """
+        # 1. Unicode normalization (NFC - composed form)
+        # This ensures "café" (NFC) and "café" (NFD) are treated as identical
+        name = unicodedata.normalize('NFC', name)
+        
+        # 2. Replace non-breaking spaces (U+00A0) with regular spaces (U+0020)
+        # Excel often uses non-breaking spaces, which look identical but compare differently
+        name = name.replace('\u00A0', ' ')
+        
+        # 3. Strip leading/trailing whitespace
+        name = name.strip()
+        
+        # 4. Collapse multiple consecutive spaces into one
+        # "Name  Value" → "Name Value"
+        name = ' '.join(name.split())
+        
+        return name
+
+    def _find_column(
+        self,
+        df: pd.DataFrame,
+        column_name: str,
+        context: str = "operation"
+    ) -> str:
+        """Find column in DataFrame using normalized matching.
+        
+        Uses Unicode normalization to handle:
+        - NFC/NFD forms (composed vs decomposed)
+        - Non-breaking spaces (U+00A0)
+        - Leading/trailing/multiple whitespace
+        
+        Args:
+            df: DataFrame to search in
+            column_name: Column name to find (will be normalized)
+            context: Context for error message (e.g., "filter", "aggregation")
+        
+        Returns:
+            Original column name from DataFrame (not normalized)
+        
+        Raises:
+            ValueError: If column not found (with fuzzy suggestions)
+        
+        Example:
+            >>> df = pd.DataFrame({"café": [1, 2, 3]})  # NFC in DataFrame
+            >>> _find_column(df, "café")  # NFD in request
+            "café"  # Returns original NFC name from DataFrame
+        """
+        # Normalize requested column name
+        normalized_request = self._normalize_column_name(column_name)
+        
+        # Build mapping: normalized name → original DataFrame column name
+        normalized_to_original = {
+            self._normalize_column_name(col): col
+            for col in df.columns
+        }
+        
+        # Find column using normalized comparison
+        if normalized_request in normalized_to_original:
+            # Return original column name from DataFrame
+            return normalized_to_original[normalized_request]
+        
+        # Column not found - provide helpful error with fuzzy matching
+        suggestions = get_close_matches(
+            normalized_request,
+            normalized_to_original.keys(),
+            n=3,
+            cutoff=0.6
+        )
+        
+        available = ", ".join(df.columns.tolist())
+        suggestion_text = ""
+        if suggestions:
+            # Map back to original names for suggestions
+            original_suggestions = [
+                normalized_to_original[s] for s in suggestions
+            ]
+            suggestion_text = f" Did you mean: {', '.join(repr(s) for s in original_suggestions)}?"
+        
+        raise ValueError(
+            f"Column '{column_name}' not found in {context}.{suggestion_text} "
+            f"Available columns: {available}"
+        )
+
+    def _find_columns(
+        self,
+        df: pd.DataFrame,
+        column_names: list[str],
+        context: str = "operation"
+    ) -> list[str]:
+        """Find multiple columns in DataFrame using normalized matching.
+        
+        Args:
+            df: DataFrame to search in
+            column_names: List of column names to find
+            context: Context for error message
+        
+        Returns:
+            List of original column names from DataFrame
+        
+        Raises:
+            ValueError: If any column not found
+        """
+        return [self._find_column(df, col, context) for col in column_names]
 
     def _validate_response_size(
         self, 

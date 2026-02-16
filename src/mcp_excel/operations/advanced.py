@@ -55,31 +55,32 @@ class AdvancedOperations(BaseOperations):
             request.file_path, request.sheet_name, request.header_row
         )
 
-        # Validate rank column
-        if request.rank_column not in df.columns:
-            raise ValueError(
-                f"Rank column '{request.rank_column}' not found. "
-                f"Available columns: {list(df.columns)}"
-            )
+        # Find rank column using normalized matching
+        actual_rank_column = self._find_column(df, request.rank_column, context="rank_rows")
 
         # Apply filters
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
+        # Normalize group_by_columns if provided
+        actual_group_by_columns = None
+        if request.group_by_columns:
+            actual_group_by_columns = self._find_columns(df, request.group_by_columns, context="rank_rows")
+
         # Convert rank column to numeric
-        df[request.rank_column] = pd.to_numeric(df[request.rank_column], errors='coerce')
+        df[actual_rank_column] = pd.to_numeric(df[actual_rank_column], errors='coerce')
 
         # Calculate ranks
         ascending = request.direction == "asc"
         
-        if request.group_by_columns:
+        if actual_group_by_columns:
             # Rank within groups
-            df['rank'] = df.groupby(request.group_by_columns)[request.rank_column].rank(
+            df['rank'] = df.groupby(actual_group_by_columns)[actual_rank_column].rank(
                 ascending=ascending, method='min'
             )
         else:
             # Global ranking
-            df['rank'] = df[request.rank_column].rank(ascending=ascending, method='min')
+            df['rank'] = df[actual_rank_column].rank(ascending=ascending, method='min')
 
         # Sort by rank
         df = df.sort_values(by='rank')
@@ -107,7 +108,7 @@ class AdvancedOperations(BaseOperations):
         column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
         
         # Find rank column index
-        rank_col_idx = column_indices.get(request.rank_column)
+        rank_col_idx = column_indices.get(actual_rank_column)
         if rank_col_idx is not None:
             col_letter = formula_gen._column_letter(rank_col_idx)
             # RANK(value, range, order) where order: 0=desc, 1=asc
@@ -165,25 +166,30 @@ class AdvancedOperations(BaseOperations):
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
         # Find which DataFrame columns are used in the expression
+        # Use Unicode normalization to handle NFC/NFD variations
+        
+        # Build normalized mapping
+        normalized_to_original = {
+            self._normalize_column_name(col): col
+            for col in df.columns
+        }
+        
+        # Normalize expression for searching
+        normalized_expr = self._normalize_column_name(request.expression)
+        
         # Sort by length (longest first) to avoid partial matches
         # Example: "Дата прибытия" must be found before "Дата"
-        # This approach is language-agnostic and works with any Unicode characters
-        sorted_columns = sorted(df.columns, key=len, reverse=True)
-        used_columns = [col for col in sorted_columns if col in request.expression]
+        sorted_normalized = sorted(normalized_to_original.keys(), key=len, reverse=True)
+        used_normalized = [col for col in sorted_normalized if col in normalized_expr]
         
-        if not used_columns:
+        if not used_normalized:
             raise ValueError(
                 f"No valid column names found in expression '{request.expression}'. "
                 f"Available columns: {list(df.columns)}"
             )
-
-        # Validate all used columns exist
-        for col in used_columns:
-            if col not in df.columns:
-                raise ValueError(
-                    f"Column '{col}' from expression not found. "
-                    f"Available columns: {list(df.columns)}"
-                )
+        
+        # Map back to original column names from DataFrame
+        used_columns = [normalized_to_original[col] for col in used_normalized]
 
         # Convert columns to numeric
         for col in used_columns:
@@ -191,7 +197,8 @@ class AdvancedOperations(BaseOperations):
 
         # Build safe expression for pandas.eval()
         # Backtick-quote column names to handle spaces and special chars
-        safe_expr = request.expression
+        # Normalize expression first so Unicode forms match for replacement
+        safe_expr = self._normalize_column_name(request.expression)
         for col in sorted(used_columns, key=len, reverse=True):  # Sort by length to avoid partial replacements
             safe_expr = safe_expr.replace(col, f"`{col}`")
 
@@ -222,7 +229,8 @@ class AdvancedOperations(BaseOperations):
         column_indices = {str(col): idx for idx, col in enumerate(df.columns)}
         
         # Convert expression to Excel formula syntax
-        excel_formula = request.expression
+        # Normalize expression first so Unicode forms match for replacement
+        excel_formula = self._normalize_column_name(request.expression)
         for col in sorted(used_columns, key=len, reverse=True):
             if col in column_indices:
                 col_idx = column_indices[col]
