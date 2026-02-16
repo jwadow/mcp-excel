@@ -550,3 +550,521 @@ def test_filter_all_match(filter_engine, sample_df):
     print(f"✅ Result length: {len(result)}")
     
     assert len(result) == len(sample_df), "Should return all rows"
+
+
+# ============================================================================
+# UNICODE NORMALIZATION (NFC/NFD, Non-breaking spaces, Whitespace)
+# ============================================================================
+
+@pytest.fixture
+def df_with_unicode_columns():
+    """DataFrame with Unicode column names in NFC form (composed).
+    
+    This simulates what Pandas returns after reading an Excel file.
+    """
+    return pd.DataFrame({
+        "café": [1, 2, 3],  # NFC form (single character é = U+00E9)
+        "Нетто, кг": [10, 20, 30],  # Regular space (U+0020)
+        "Name": [100, 200, 300],  # ASCII for control
+        "Клиент": ["A", "B", "C"],  # Cyrillic
+    })
+
+
+@pytest.fixture
+def df_with_nonbreaking_spaces():
+    """DataFrame with non-breaking spaces in column names.
+    
+    This simulates real Excel files where non-breaking spaces (U+00A0)
+    are used instead of regular spaces (U+0020).
+    """
+    return pd.DataFrame({
+        "Нетто,\u00A0кг": [10, 20, 30],  # Non-breaking space (U+00A0)
+        "Name\u00A0Value": [100, 200, 300],  # Non-breaking space
+    })
+
+
+@pytest.fixture
+def df_with_messy_whitespace():
+    """DataFrame with messy whitespace in column names."""
+    return pd.DataFrame({
+        " Name ": [1, 2, 3],  # Leading/trailing spaces
+        "Value  Total": [10, 20, 30],  # Double space
+        "  Price  ": [100, 200, 300],  # Multiple leading/trailing
+    })
+
+
+def test_unicode_nfc_vs_nfd_cafe(filter_engine, df_with_unicode_columns):
+    """Test filtering with NFD form when DataFrame has NFC form.
+    
+    Real scenario: Agent copies "café" from get_sheet_info (NFC),
+    but user's filter uses NFD form (e + combining accent).
+    """
+    print(f"\n📂 Testing NFC vs NFD: café")
+    
+    import unicodedata
+    
+    # Create NFD form (decomposed: e + combining acute accent)
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    print(f"   Filter uses NFD: {repr(cafe_nfd)}")
+    print(f"   DataFrame has NFC: {repr('café')}")
+    
+    # This should work despite different Unicode forms
+    filters = [FilterCondition(column=cafe_nfd, operator="==", value=1)]
+    result = filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 1, "Should find column despite NFD vs NFC difference"
+    assert result.iloc[0]["café"] == 1, "Should return correct row"
+
+
+def test_unicode_nfd_vs_nfc_cyrillic(filter_engine, df_with_unicode_columns):
+    """Test Cyrillic Unicode normalization."""
+    print(f"\n📂 Testing NFC vs NFD: Cyrillic")
+    
+    import unicodedata
+    
+    # Cyrillic "Клиент" - ensure it works in both forms
+    column_nfc = "Клиент"
+    column_nfd = unicodedata.normalize('NFD', column_nfc)
+    
+    print(f"   Filter uses NFD: {repr(column_nfd)}")
+    print(f"   DataFrame has NFC: {repr(column_nfc)}")
+    
+    filters = [FilterCondition(column=column_nfd, operator="==", value="A")]
+    result = filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 1, "Should find Cyrillic column despite Unicode form"
+    assert result.iloc[0]["Клиент"] == "A", "Should return correct row"
+
+
+def test_unicode_nonbreaking_space_to_regular(filter_engine, df_with_nonbreaking_spaces):
+    """Test filtering with regular space when DataFrame has non-breaking space.
+    
+    Real scenario: User types "Нетто, кг" with regular space (U+0020),
+    but Excel file has non-breaking space (U+00A0).
+    """
+    print(f"\n📂 Testing non-breaking space → regular space")
+    
+    # Filter uses regular space
+    filter_column = "Нетто, кг"  # Regular space (U+0020)
+    df_column = "Нетто,\u00A0кг"  # Non-breaking space (U+00A0)
+    
+    print(f"   Filter: {repr(filter_column)}")
+    print(f"   DataFrame: {repr(df_column)}")
+    print(f"   Visually identical but: {filter_column == df_column}")  # False!
+    
+    filters = [FilterCondition(column=filter_column, operator=">", value=15)]
+    result = filter_engine.apply_filters(df_with_nonbreaking_spaces, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 2, "Should find column despite space type difference"
+    assert all(result[df_column] > 15), "Should filter correctly"
+
+
+def test_unicode_regular_space_to_nonbreaking(filter_engine, df_with_unicode_columns):
+    """Test filtering with non-breaking space when DataFrame has regular space."""
+    print(f"\n📂 Testing regular space → non-breaking space")
+    
+    # Filter uses non-breaking space
+    filter_column = "Нетто,\u00A0кг"  # Non-breaking space (U+00A0)
+    df_column = "Нетто, кг"  # Regular space (U+0020)
+    
+    print(f"   Filter: {repr(filter_column)}")
+    print(f"   DataFrame: {repr(df_column)}")
+    
+    filters = [FilterCondition(column=filter_column, operator="==", value=10)]
+    result = filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 1, "Should find column despite space type difference"
+    assert result.iloc[0][df_column] == 10, "Should return correct row"
+
+
+def test_unicode_leading_trailing_spaces(filter_engine, df_with_messy_whitespace):
+    """Test filtering with leading/trailing spaces.
+    
+    Real scenario: User types " Name " (with spaces), but column is "Name".
+    """
+    print(f"\n📂 Testing leading/trailing spaces")
+    
+    # Filter without spaces, DataFrame with spaces
+    filter_column = "Name"
+    df_column = " Name "
+    
+    print(f"   Filter: {repr(filter_column)}")
+    print(f"   DataFrame: {repr(df_column)}")
+    
+    filters = [FilterCondition(column=filter_column, operator="==", value=1)]
+    result = filter_engine.apply_filters(df_with_messy_whitespace, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 1, "Should find column despite leading/trailing spaces"
+    assert result.iloc[0][df_column] == 1, "Should return correct row"
+
+
+def test_unicode_multiple_spaces(filter_engine, df_with_messy_whitespace):
+    """Test filtering with multiple consecutive spaces."""
+    print(f"\n📂 Testing multiple consecutive spaces")
+    
+    # Filter with single space, DataFrame with double space
+    filter_column = "Value Total"  # Single space
+    df_column = "Value  Total"  # Double space
+    
+    print(f"   Filter: {repr(filter_column)}")
+    print(f"   DataFrame: {repr(df_column)}")
+    
+    filters = [FilterCondition(column=filter_column, operator=">", value=15)]
+    result = filter_engine.apply_filters(df_with_messy_whitespace, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 2, "Should find column despite multiple spaces"
+
+
+def test_unicode_combined_edge_case(filter_engine):
+    """Test combination of Unicode normalization + non-breaking spaces + whitespace.
+    
+    Worst case: NFC/NFD + non-breaking space + leading/trailing spaces.
+    """
+    print(f"\n📂 Testing combined Unicode + spaces")
+    
+    import unicodedata
+    
+    # DataFrame with NFC + non-breaking space + trailing space
+    df = pd.DataFrame({
+        "café\u00A0bar ": [1, 2, 3],  # NFC + non-breaking + trailing
+    })
+    
+    # Filter with NFD + regular space + no trailing space
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    filter_column = f"{cafe_nfd} bar"  # NFD + regular space + no trailing
+    
+    # Define string outside f-string to avoid backslash in f-string expression
+    df_column_example = "café\u00A0bar "
+    
+    print(f"   Filter: {repr(filter_column)}")
+    print(f"   DataFrame: {repr(df_column_example)}")
+    
+    filters = [FilterCondition(column=filter_column, operator="==", value=2)]
+    result = filter_engine.apply_filters(df, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 1, "Should handle combined Unicode + space variations"
+    assert result.iloc[0]["café\u00A0bar "] == 2, "Should return correct row"
+
+
+def test_unicode_fuzzy_matching_suggestions(filter_engine, df_with_unicode_columns):
+    """Test that error message includes fuzzy matching suggestions.
+    
+    When column is not found, system should suggest similar columns.
+    """
+    print(f"\n📂 Testing fuzzy matching suggestions")
+    
+    # Typo: "Namee" instead of "Name"
+    filters = [FilterCondition(column="Namee", operator="==", value=100)]
+    
+    with pytest.raises(ValueError) as exc_info:
+        filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    error_msg = str(exc_info.value)
+    print(f"✅ Error message: {error_msg}")
+    
+    assert "not found" in error_msg.lower(), "Should mention column not found"
+    assert "did you mean" in error_msg.lower(), "Should provide suggestions"
+    assert "Name" in error_msg, "Should suggest 'Name' as close match"
+
+
+def test_unicode_cyrillic_fuzzy_matching(filter_engine, df_with_unicode_columns):
+    """Test fuzzy matching with Cyrillic typo."""
+    print(f"\n📂 Testing Cyrillic fuzzy matching")
+    
+    # Typo: "Клиенты" instead of "Клиент"
+    filters = [FilterCondition(column="Клиенты", operator="==", value="A")]
+    
+    with pytest.raises(ValueError) as exc_info:
+        filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    error_msg = str(exc_info.value)
+    print(f"✅ Error message: {error_msg}")
+    
+    assert "Клиент" in error_msg, "Should suggest 'Клиент' as close match"
+
+
+def test_unicode_validate_filters_consistency(filter_engine, df_with_unicode_columns):
+    """Test that validate_filters uses same normalization logic.
+    
+    Critical: validate_filters must use same normalization as apply_filters.
+    """
+    print(f"\n📂 Testing validate_filters with Unicode")
+    
+    import unicodedata
+    
+    # Use NFD form
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    filters = [FilterCondition(column=cafe_nfd, operator="==", value=1)]
+    
+    is_valid, error = filter_engine.validate_filters(df_with_unicode_columns, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is True, "validate_filters should accept NFD form"
+    assert error is None, "Should have no error"
+
+
+def test_unicode_validate_with_suggestions(filter_engine, df_with_unicode_columns):
+    """Test validate_filters provides suggestions for invalid columns."""
+    print(f"\n📂 Testing validate_filters with suggestions")
+    
+    # Typo: "Namee" instead of "Name"
+    filters = [FilterCondition(column="Namee", operator="==", value=100)]
+    
+    is_valid, error = filter_engine.validate_filters(df_with_unicode_columns, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is False, "Should be invalid"
+    assert "not found" in error.lower(), "Error should mention column not found"
+    assert "did you mean" in error.lower(), "Should provide suggestions"
+    assert "Name" in error, "Should suggest 'Name'"
+
+
+def test_unicode_count_filtered_consistency(filter_engine, df_with_unicode_columns):
+    """Test that count_filtered uses same normalization logic."""
+    print(f"\n📂 Testing count_filtered with Unicode")
+    
+    import unicodedata
+    
+    # Use NFD form
+    cafe_nfd = unicodedata.normalize('NFD', "café")
+    filters = [FilterCondition(column=cafe_nfd, operator=">", value=1)]
+    
+    count = filter_engine.count_filtered(df_with_unicode_columns, filters)
+    
+    print(f"✅ Count: {count}")
+    
+    assert count == 2, "count_filtered should handle NFD form"
+
+
+@pytest.mark.parametrize("unicode_form", ["NFC", "NFD", "NFKC", "NFKD"])
+def test_unicode_all_forms_parametrized(filter_engine, df_with_unicode_columns, unicode_form):
+    """Test all Unicode normalization forms (parametrized).
+    
+    Ensures system works with any Unicode normalization form.
+    """
+    print(f"\n📂 Testing Unicode form: {unicode_form}")
+    
+    import unicodedata
+    
+    # Normalize "café" to specified form
+    cafe_normalized = unicodedata.normalize(unicode_form, "café")
+    print(f"   Using form {unicode_form}: {repr(cafe_normalized)}")
+    
+    filters = [FilterCondition(column=cafe_normalized, operator=">", value=0)]
+    result = filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 3, f"Should find column with {unicode_form} form"
+
+
+def test_unicode_extreme_whitespace(filter_engine, df_with_messy_whitespace):
+    """Test extreme whitespace: multiple leading/trailing spaces."""
+    print(f"\n📂 Testing extreme whitespace")
+    
+    # Filter with clean name, DataFrame with messy spaces
+    filter_column = "Price"
+    df_column = "  Price  "
+    
+    print(f"   Filter: {repr(filter_column)}")
+    print(f"   DataFrame: {repr(df_column)}")
+    
+    filters = [FilterCondition(column=filter_column, operator=">=", value=100)]
+    result = filter_engine.apply_filters(df_with_messy_whitespace, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 3, "Should find column despite extreme whitespace"
+
+
+def test_unicode_multiple_nonbreaking_spaces(filter_engine, df_with_nonbreaking_spaces):
+    """Test column with multiple non-breaking spaces."""
+    print(f"\n📂 Testing multiple non-breaking spaces")
+    
+    # Filter uses regular spaces
+    filter_column = "Name Value"  # Regular spaces
+    
+    filters = [FilterCondition(column=filter_column, operator="<", value=250)]
+    result = filter_engine.apply_filters(df_with_nonbreaking_spaces, filters)
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 2, "Should find column with multiple non-breaking spaces"
+
+
+def test_unicode_cyrillic_with_nonbreaking(filter_engine):
+    """Test Cyrillic + non-breaking spaces (common in Russian Excel files)."""
+    print(f"\n📂 Testing Cyrillic + non-breaking spaces")
+    
+    # DataFrame with non-breaking space
+    df = pd.DataFrame({
+        "Нетто,\u00A0кг": [10, 20, 30],
+        "Клиент\u00A0ID": ["A", "B", "C"],
+    })
+    
+    # Filter with regular spaces
+    filters = [
+        FilterCondition(column="Нетто, кг", operator=">", value=15),
+        FilterCondition(column="Клиент ID", operator="==", value="B"),
+    ]
+    result = filter_engine.apply_filters(df, filters, logic="AND")
+    
+    print(f"✅ Filtered {len(result)} row(s)")
+    
+    assert len(result) == 1, "Should handle Cyrillic + non-breaking spaces"
+    assert result.iloc[0]["Клиент\u00A0ID"] == "B", "Should return correct row"
+
+
+def test_unicode_no_close_matches(filter_engine, df_with_unicode_columns):
+    """Test error message when no close matches exist."""
+    print(f"\n📂 Testing no close matches")
+    
+    # Completely different column name
+    filters = [FilterCondition(column="XYZ123", operator="==", value=1)]
+    
+    with pytest.raises(ValueError) as exc_info:
+        filter_engine.apply_filters(df_with_unicode_columns, filters)
+    
+    error_msg = str(exc_info.value)
+    print(f"✅ Error message: {error_msg}")
+    
+    assert "not found" in error_msg.lower(), "Should mention column not found"
+
+
+def test_unicode_validate_with_nonbreaking(filter_engine, df_with_nonbreaking_spaces):
+    """Test validate_filters with non-breaking space."""
+    print(f"\n📂 Testing validate_filters with non-breaking space")
+    
+    # Filter uses regular space, DataFrame has non-breaking
+    filters = [FilterCondition(column="Нетто, кг", operator=">", value=10)]
+    
+    is_valid, error = filter_engine.validate_filters(df_with_nonbreaking_spaces, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is True, "validate_filters should handle space variations"
+    assert error is None, "Should have no error"
+
+
+def test_unicode_validate_with_whitespace(filter_engine, df_with_messy_whitespace):
+    """Test validate_filters with messy whitespace."""
+    print(f"\n📂 Testing validate_filters with whitespace")
+    
+    # Filter without spaces, DataFrame with spaces
+    filters = [FilterCondition(column="Name", operator="==", value=1)]
+    
+    is_valid, error = filter_engine.validate_filters(df_with_messy_whitespace, filters)
+    
+    print(f"✅ Valid: {is_valid}, Error: {error}")
+    
+    assert is_valid is True, "validate_filters should handle whitespace"
+    assert error is None, "Should have no error"
+
+
+def test_unicode_count_with_nonbreaking(filter_engine, df_with_nonbreaking_spaces):
+    """Test count_filtered with non-breaking space."""
+    print(f"\n📂 Testing count_filtered with non-breaking space")
+    
+    # Filter uses regular space
+    filters = [FilterCondition(column="Нетто, кг", operator=">=", value=20)]
+    
+    count = filter_engine.count_filtered(df_with_nonbreaking_spaces, filters)
+    
+    print(f"✅ Count: {count}")
+    
+    assert count == 2, "count_filtered should handle space variations"
+
+
+# ============================================================================
+# NORMALIZATION METHOD UNIT TESTS (Direct testing of _normalize_column_name)
+# ============================================================================
+
+def test_normalize_method_nfc_nfd(filter_engine):
+    """Test _normalize_column_name with NFC/NFD forms."""
+    print(f"\n📂 Testing _normalize_column_name: NFC/NFD")
+    
+    import unicodedata
+    
+    cafe_nfc = "café"  # NFC (composed)
+    cafe_nfd = unicodedata.normalize('NFD', "café")  # NFD (decomposed)
+    
+    normalized_nfc = filter_engine._normalize_column_name(cafe_nfc)
+    normalized_nfd = filter_engine._normalize_column_name(cafe_nfd)
+    
+    print(f"   NFC input: {repr(cafe_nfc)} → {repr(normalized_nfc)}")
+    print(f"   NFD input: {repr(cafe_nfd)} → {repr(normalized_nfd)}")
+    
+    assert normalized_nfc == normalized_nfd, "NFC and NFD should normalize to same result"
+    assert normalized_nfc == "café", "Should normalize to NFC form"
+
+
+def test_normalize_method_nonbreaking_space(filter_engine):
+    """Test _normalize_column_name with non-breaking space."""
+    print(f"\n📂 Testing _normalize_column_name: non-breaking space")
+    
+    with_regular = "Нетто, кг"  # Regular space (U+0020)
+    with_nonbreaking = "Нетто,\u00A0кг"  # Non-breaking space (U+00A0)
+    
+    normalized_regular = filter_engine._normalize_column_name(with_regular)
+    normalized_nonbreaking = filter_engine._normalize_column_name(with_nonbreaking)
+    
+    print(f"   Regular space: {repr(with_regular)} → {repr(normalized_regular)}")
+    print(f"   Non-breaking: {repr(with_nonbreaking)} → {repr(normalized_nonbreaking)}")
+    
+    assert normalized_regular == normalized_nonbreaking, "Should normalize to same result"
+    assert "\u00A0" not in normalized_nonbreaking, "Should remove non-breaking spaces"
+
+
+def test_normalize_method_whitespace(filter_engine):
+    """Test _normalize_column_name with various whitespace."""
+    print(f"\n📂 Testing _normalize_column_name: whitespace")
+    
+    test_cases = [
+        (" Name ", "Name"),  # Leading/trailing
+        ("Name  Value", "Name Value"),  # Double space
+        ("  Price  ", "Price"),  # Multiple leading/trailing
+        ("\tName\t", "Name"),  # Tabs
+        ("Name\n", "Name"),  # Newline
+    ]
+    
+    for input_str, expected in test_cases:
+        result = filter_engine._normalize_column_name(input_str)
+        print(f"   {repr(input_str)} → {repr(result)}")
+        assert result == expected, f"Should normalize {repr(input_str)} to {repr(expected)}"
+
+
+def test_normalize_method_combined(filter_engine):
+    """Test _normalize_column_name with combined edge cases."""
+    print(f"\n📂 Testing _normalize_column_name: combined")
+    
+    import unicodedata
+    
+    # NFC + non-breaking + leading/trailing spaces
+    cafe_nfc = "café"
+    input_str = f" {cafe_nfc}\u00A0bar "
+    
+    result = filter_engine._normalize_column_name(input_str)
+    
+    print(f"   Input: {repr(input_str)}")
+    print(f"   Output: {repr(result)}")
+    
+    assert result == "café bar", "Should handle combined normalization"
+    assert "\u00A0" not in result, "Should remove non-breaking space"
+    assert not result.startswith(" "), "Should remove leading space"
+    assert not result.endswith(" "), "Should remove trailing space"

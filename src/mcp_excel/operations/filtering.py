@@ -6,6 +6,8 @@
 """Filtering system for DataFrame operations."""
 
 import re
+import unicodedata
+from difflib import get_close_matches
 from typing import Any
 
 import pandas as pd
@@ -20,6 +22,46 @@ class FilterEngine:
     def __init__(self) -> None:
         """Initialize filter engine."""
         self._datetime_converter = DateTimeConverter()
+    
+    def _normalize_column_name(self, name: str) -> str:
+        """Normalize column name for robust matching.
+        
+        Handles:
+        - Unicode normalization (NFC - composed form)
+        - Non-breaking spaces (U+00A0) → regular spaces (U+0020)
+        - Leading/trailing whitespace
+        - Multiple consecutive spaces → single space
+        
+        Args:
+            name: Column name to normalize
+        
+        Returns:
+            Normalized column name
+        
+        Examples:
+            >>> _normalize_column_name("café")  # NFC or NFD
+            "café"  # Always NFC
+            >>> _normalize_column_name("Нетто, кг")  # Non-breaking space
+            "Нетто, кг"  # Regular space
+            >>> _normalize_column_name("  Name  ")
+            "Name"
+        """
+        # 1. Unicode normalization (NFC - composed form)
+        # This ensures "café" (NFC) and "café" (NFD) are treated as identical
+        name = unicodedata.normalize('NFC', name)
+        
+        # 2. Replace non-breaking spaces (U+00A0) with regular spaces (U+0020)
+        # Excel often uses non-breaking spaces, which look identical but compare differently
+        name = name.replace('\u00A0', ' ')
+        
+        # 3. Strip leading/trailing whitespace
+        name = name.strip()
+        
+        # 4. Collapse multiple consecutive spaces into one
+        # "Name  Value" → "Name Value"
+        name = ' '.join(name.split())
+        
+        return name
 
     def apply_filters(
         self,
@@ -115,16 +157,42 @@ class FilterEngine:
         Raises:
             ValueError: If column doesn't exist or filter is invalid
         """
-        column = filter_cond.column
-
-        # Check if column exists
-        if column not in df.columns:
-            available = ", ".join(df.columns.tolist())
-            raise ValueError(
-                f"Column '{column}' not found. Available columns: {available}"
+        # Normalize filter column name
+        filter_col_normalized = self._normalize_column_name(filter_cond.column)
+        
+        # Build mapping: normalized name → original DataFrame column name
+        normalized_to_original = {
+            self._normalize_column_name(col): col
+            for col in df.columns
+        }
+        
+        # Find column using normalized comparison
+        if filter_col_normalized not in normalized_to_original:
+            # Column not found - provide helpful error with fuzzy matching
+            suggestions = get_close_matches(
+                filter_col_normalized,
+                normalized_to_original.keys(),
+                n=3,
+                cutoff=0.6
             )
-
-        col_data = df[column]
+            
+            available = ", ".join(df.columns.tolist())
+            suggestion_text = ""
+            if suggestions:
+                # Map back to original names for suggestions
+                original_suggestions = [
+                    normalized_to_original[s] for s in suggestions
+                ]
+                suggestion_text = f" Did you mean: {', '.join(repr(s) for s in original_suggestions)}?"
+            
+            raise ValueError(
+                f"Column '{filter_cond.column}' not found.{suggestion_text} "
+                f"Available columns: {available}"
+            )
+        
+        # Use original column name from DataFrame
+        actual_column = normalized_to_original[filter_col_normalized]
+        col_data = df[actual_column]
         operator = filter_cond.operator
         
         # Parse filter value for datetime columns
@@ -206,13 +274,37 @@ class FilterEngine:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        # Build normalized column mapping once for all filters
+        normalized_to_original = {
+            self._normalize_column_name(col): col
+            for col in df.columns
+        }
+        
         for filter_cond in filters:
-            # Check column exists
-            if filter_cond.column not in df.columns:
+            # Check column exists using normalized comparison
+            filter_col_normalized = self._normalize_column_name(filter_cond.column)
+            
+            if filter_col_normalized not in normalized_to_original:
+                # Column not found - provide helpful error with fuzzy matching
+                suggestions = get_close_matches(
+                    filter_col_normalized,
+                    normalized_to_original.keys(),
+                    n=3,
+                    cutoff=0.6
+                )
+                
                 available = ", ".join(df.columns.tolist())
+                suggestion_text = ""
+                if suggestions:
+                    # Map back to original names for suggestions
+                    original_suggestions = [
+                        normalized_to_original[s] for s in suggestions
+                    ]
+                    suggestion_text = f" Did you mean: {', '.join(repr(s) for s in original_suggestions)}?"
+                
                 return (
                     False,
-                    f"Column '{filter_cond.column}' not found. Available: {available}",
+                    f"Column '{filter_cond.column}' not found.{suggestion_text} Available: {available}",
                 )
 
             # Check operator-specific requirements
