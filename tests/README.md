@@ -111,6 +111,85 @@ Integration tests verify end-to-end functionality. Approximately 9 files organiz
 - Tools: `rank_rows`, `calculate_expression`
 - Tests: ranking (top-N, grouped), expression evaluation, formula generation
 
+---
+
+### Smoke Tests Structure
+
+Smoke tests verify end-to-end functionality through real JSON-RPC protocol. Approximately 9 files organized by tool category:
+
+**Infrastructure** (`tests/smoke/conftest.py`):
+- `MCPServerProcess` class for managing real MCP server subprocess
+- JSON-RPC communication via STDIO
+- Fixtures: `mcp_server` (module-scoped), `mcp_call_tool` (convenience wrapper)
+- Graceful shutdown with timeouts
+
+**Basic Tests** (`tests/smoke/test_smoke_basic.py` - 9 tests):
+- Server lifecycle (startup, initialization, shutdown)
+- Tool discovery (list all 24 tools)
+- JSON Schema validation (Draft 7 compliance)
+- Filter definitions placement verification (critical bug fix)
+- Error handling (invalid tool names, invalid arguments)
+
+**Inspection Tools** (`tests/smoke/test_smoke_inspection.py` - 12 tests):
+- `inspect_file`, `get_sheet_info`, `get_column_names`, `get_data_profile`, `find_column`
+- Full response structure validation
+- Multi-sheet handling
+- Header auto-detection
+- Case-insensitive search
+
+**Data Retrieval** (`tests/smoke/test_smoke_data_retrieval.py` - 11 tests):
+- `get_unique_values`, `get_value_counts`, `filter_and_get_rows`
+- Pagination support
+- TSV output validation
+- Complex filters
+
+**Filtering and Counting** (`tests/smoke/test_smoke_filtering.py` - 13 tests):
+- `filter_and_count`, `filter_and_count_batch`
+- Nested filter groups (1-3 levels deep) - CRITICAL for bug prevention
+- All 12 filter operators
+- Batch processing
+
+**Aggregation** (`tests/smoke/test_smoke_aggregation.py` - 12 tests):
+- `aggregate` (all 8 operations), `group_by`
+- With filters and nested groups
+- Multi-column grouping
+- Excel formula generation
+
+**Statistics, Validation, Multi-sheet** (`tests/smoke/test_smoke_stats_validation_multisheet.py` - 10 tests):
+- `get_column_stats`, `correlate`, `detect_outliers`
+- `find_duplicates`, `find_nulls`
+- `search_across_sheets`, `compare_sheets`
+
+**Time Series** (`tests/smoke/test_smoke_timeseries.py` - 11 tests):
+- `calculate_period_change` (month/quarter/year)
+- `calculate_running_total` (with grouping)
+- `calculate_moving_average` (various window sizes)
+
+**Advanced** (`tests/smoke/test_smoke_advanced.py` - 12 tests):
+- `rank_rows` (ascending/descending, top-N, grouping)
+- `calculate_expression` (arithmetic operations, complex expressions)
+
+**Coverage:** 24/24 MCP tools (100%)
+
+**Running smoke tests:**
+```bash
+# Run all smoke tests
+pytest tests/smoke/ -v
+
+# Run specific category
+pytest tests/smoke/test_smoke_filtering.py -v
+
+# Run with detailed output
+pytest tests/smoke/ -v -s
+```
+
+**Performance:**
+- Server startup: ~1 second
+- Per test: 10-50ms
+- Total: ~5-10 seconds for all smoke tests
+
+---
+
 ### Why This Structure Works
 
 **Prevents File Bloat:** Each file stays under 600 lines by focusing on a specific feature area, not on mirroring code structure.
