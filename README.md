@@ -15,7 +15,7 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
 *Works with OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
 
-[Why This Exists](#why-this-exists) • [What Your Agent Can Do](#what-your-agent-can-do) • [Installation](#installation) • [Configuration](#configuration) • [Available Tools](#available-tools) • [💖 Sponsor](#-support-the-project)
+[Why This Exists](#why-this-exists) • [What Your Agent Can Do](#what-your-agent-can-do) • [Installation & Configuration](#installation--configuration) • [Available Tools](#available-tools) • [💖 Sponsor](#-support-the-project)
 
 </div>
 
@@ -25,7 +25,7 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
 **The Problem:** Most Excel tools for AI dump raw spreadsheet data into the agent's context. This floods the context window, slows everything down, and the AI can still miscalculate or get confused in large datasets.
 
-**This Project:** Think SQL for Excel. Your AI agent composes atomic operations (`filter_and_count`, `aggregate`, `group_by`) and gets back precise results—not thousands of rows.
+**This Project:** Think SQL for Excel. Your AI agent composes atomic operations (`filter_and_count`, `aggregate`, `group_by`) and gets back precise results — not thousands of rows.
 
 The agent analyzes data **without seeing it**. Results come as numbers, formulas, and insights.
 
@@ -36,7 +36,7 @@ The agent analyzes data **without seeing it**. Results come as numbers, formulas
 
 [Model Context Protocol](https://modelcontextprotocol.io) is an open standard that lets AI agents use external tools.
 
-This server is such a tool. When you connect it to your AI agent (Claude Desktop, Cline, Roo Code, Cursor, etc.), your agent gets 25 new commands for working with Excel files—filtering, counting, aggregating, analyzing.
+This server is such a tool. When you connect it to your AI agent (Claude Desktop, Cline, Roo Code, Cursor, etc.), your agent gets 25 new commands for working with Excel files — filtering, counting, aggregating, analyzing.
 
 **The key benefit:** Your AI doesn't load thousands of spreadsheet rows into its memory. Instead, it asks specific questions and gets precise answers. Faster, more accurate, no context overflow.
 
@@ -46,7 +46,7 @@ This server is such a tool. When you connect it to your AI agent (Claude Desktop
 
 Real feedback from AI agents that used this MCP server in production:
 
-> *"Analyzed 34,211 rows without loading data into context. Every operation returns just the result—count, sum, average. Context stays clean. Operations execute in 25-45ms regardless of file size."*
+> *"Analyzed 34,211 rows without loading data into context. Every operation returns just the result — count, sum, average. Context stays clean. Operations execute in 25-45ms regardless of file size."*
 
 > *"This is SQL for Excel. Query, filter, aggregate—without dumping data into context. Solid tool for analytical tasks."*
 
@@ -109,63 +109,134 @@ Once connected, your AI agent gets a lot of specialized tools for analyzing spre
 - Python 3.10 or higher
 - Poetry (recommended) or pip
 
-## Installation
+## Installation & Configuration
+
+### Step 1: Clone Repository
 
 ```bash
-# Clone the repository
 git clone https://github.com/jwadow/mcp-excel.git
 cd mcp-excel
 ```
 
-Then install dependencies using one of these methods:
+*No Git? Click "Code" → "Download ZIP" at the top of this repository page, extract, and open terminal in that folder.*
 
-**Option A: Using Poetry (Recommended)**
+### Step 2: Choose Installation Method
+
+<details>
+<summary><b>Option A: Poetry (Recommended)</b></summary>
+
+*Poetry is a modern Python dependency manager (replaces pip+venv+requirements.txt). [Install it](https://python-poetry.org/docs/#installation): `pip install poetry` or `pipx install poetry`*
+
+**Install dependencies:**
 ```bash
 poetry install
 ```
 
-**Option B: Using pip**
+**Configure your AI agent:**
+
+Add this to your MCP settings (JSON config):
+```json
+{
+  "mcpServers": {
+    "excel": {
+      "command": "poetry",
+      "args": ["run", "python", "-m", "mcp_excel.main"],
+      "cwd": "C:/path/to/mcp-excel"
+    }
+  }
+}
+```
+
+**Important:** Replace `C:/path/to/mcp-excel` with actual path to the cloned repository.
+
+</details>
+
+<details>
+<summary><b>Option B: pip with virtual environment</b></summary>
+
+**Install dependencies:**
 ```bash
+# Windows
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate
+pip install -e .
+
+# Linux/Mac
+python -m venv venv
+source venv/bin/activate
 pip install -e .
 ```
 
-## Configuration
+**Find Python path in venv:**
+```bash
+# Windows
+where python
 
-### Supported AI Agents
+# Linux/Mac
+which python
+```
 
-Works with any MCP-compatible AI agent: *Claude Code, OpenCode, Codex app, Cursor, Cline, Roo Code, Kilo Code*
+**Configure your AI agent:**
 
-### Configuration Steps
+Add this to your MCP settings (JSON config):
+```json
+{
+  "mcpServers": {
+    "excel": {
+      "command": "C:/path/to/mcp-excel/venv/Scripts/python.exe",
+      "args": ["-m", "mcp_excel.main"],
+      "cwd": "C:/path/to/mcp-excel"
+    }
+  }
+}
+```
 
-1. Open your AI agent's MCP settings
-2. Add new MCP server with these parameters:
-   - **Command:** `python`
-   - **Args:** `["-m", "mcp_excel.main"]`
-   - **Working Directory:** `/path/to/mcp-excel` (replace with actual path)
+**Important:**
+- Replace `C:/path/to/mcp-excel/venv/Scripts/python.exe` with actual path from `where python` command
+- On Linux/Mac use path from `which python` (e.g., `/path/to/mcp-excel/venv/bin/python`)
 
-**Example JSON configuration** (if your agent uses JSON config):
+</details>
+
+<details>
+<summary><b>Option C: System Python (Not Recommended)</b></summary>
+
+**Install dependencies globally:**
+```bash
+pip install "mcp>=1.1.0" "pandas>=2.2.0" "pydantic>=2.10.0" "xlrd>=2.0.1" "openpyxl>=3.1.0" "psutil>=6.1.0" "python-dateutil>=2.9.0"
+```
+
+**Configure your AI agent:**
 ```json
 {
   "mcpServers": {
     "excel": {
       "command": "python",
       "args": ["-m", "mcp_excel.main"],
-      "cwd": "/path/to/mcp-excel"
+      "cwd": "C:/path/to/mcp-excel"
     }
   }
 }
 ```
 
-**Manual start for other MCP clients**
+⚠️ **Warning:** This pollutes your global Python environment. Use Poetry or venv instead.
 
-The server uses STDIO transport by default. Start it manually with:
+</details>
 
-```bash
-poetry run python -m mcp_excel.main
+### Step 3: Verify Installation
+
+Restart your AI agent and test:
 ```
+"Analyze the Excel file at C:/Users/YourName/Documents/test.xlsx"
+```
+
+If it works - you're done! If not, check:
+- Path to repository is correct in `cwd`
+- Python path is correct in `command` (for pip method)
+- All dependencies are installed
+
+### Supported AI Agents
+
+Works with any MCP-compatible AI agent.
 
 ⚠️ **Important:** This is an MCP server. It runs automatically when your AI agent needs it. Do not run it manually in terminal.
 
@@ -179,32 +250,6 @@ After configuration, restart your AI agent and ask it to analyze Excel files:
 "Find duplicates in column 'Email' in contacts.xlsx"
 "Calculate month-over-month growth from revenue.xls"
 ```
-
-## Manual Testing (Optional)
-
-Test the core functionality without running the MCP server.
-
-### Option 1: Direct execution (no installation needed)
-
-```bash
-# Install only dependencies
-pip install pandas pydantic xlrd openpyxl psutil
-
-# Run test with your Excel file
-python test_manual.py C:/Users/YourName/Documents/data.xlsx
-```
-
-### Option 2: With Poetry
-
-```bash
-# Install project
-poetry install
-
-# Run test
-poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
-```
-
-**Important:** Replace `C:/Users/YourName/Documents/data.xlsx` with the actual path to your Excel file.
 
 ## Available Tools
 
