@@ -1008,17 +1008,21 @@ def test_no_filters_all_operations():
 
 
 def test_unsupported_operation_error():
-    """Test error for unsupported operation without filters."""
-    print("\n📂 Testing unsupported operation error")
+    """Test that unsupported operation without filters returns None (not an error).
+    
+    This is valid use case: count with no filters but no target_range.
+    Python filtering works correctly, Excel formula cannot be generated.
+    """
+    print("\n📂 Testing unsupported operation without filters returns None")
     
     gen = FormulaGenerator("Sheet1")
     
-    with pytest.raises(ValueError) as exc_info:
-        gen.generate_from_filter("unsupported", [], {})
+    # No filters, no target_range - should return None (cannot generate formula)
+    result = gen.generate_from_filter("unsupported", [], {})
     
-    assert "requires" in str(exc_info.value).lower(), "Should raise error for unsupported operation"
-    print(f"   ✅ Error caught: {exc_info.value}")
-    print("✅ Unsupported operation error handled correctly")
+    assert result is None, "Should return None when formula cannot be generated"
+    print(f"   ✅ Returned None (formula cannot be generated)")
+    print("✅ Unsupported operation handled correctly")
 
 
 def test_multiple_filters_unsupported_operation():

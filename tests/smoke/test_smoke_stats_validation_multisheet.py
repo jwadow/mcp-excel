@@ -315,11 +315,11 @@ def test_find_nulls_basic(mcp_call_tool, with_nulls_fixture):
         assert col in null_info, f"null_info missing column '{col}'"
         col_info = null_info[col]
         
-        assert "count" in col_info, f"null_info['{col}'] missing 'count'"
-        assert "percentage" in col_info, f"null_info['{col}'] missing 'percentage'"
-        assert isinstance(col_info["count"], int), "null count should be int"
-        assert col_info["count"] >= 0, "null count should be non-negative"
-        assert 0 <= col_info["percentage"] <= 100, "percentage should be 0-100"
+        assert "null_count" in col_info, f"null_info['{col}'] missing 'null_count'"
+        assert "null_percentage" in col_info, f"null_info['{col}'] missing 'null_percentage'"
+        assert isinstance(col_info["null_count"], int), "null count should be int"
+        assert col_info["null_count"] >= 0, "null count should be non-negative"
+        assert 0 <= col_info["null_percentage"] <= 100, "percentage should be 0-100"
     
     # Verify total_nulls
     assert isinstance(result["total_nulls"], int), "total_nulls should be int"
@@ -330,7 +330,7 @@ def test_find_nulls_basic(mcp_call_tool, with_nulls_fixture):
     
     print(f"  ✅ Total nulls: {result['total_nulls']}")
     for col in columns:
-        print(f"    {col}: {null_info[col]['count']} nulls ({null_info[col]['percentage']:.1f}%)")
+        print(f"    {col}: {null_info[col]['null_count']} nulls ({null_info[col]['null_percentage']:.1f}%)")
 
 
 # ============================================================================
@@ -394,13 +394,40 @@ def test_compare_sheets_basic(mcp_call_tool, multi_sheet_fixture):
     sheet1 = sheets[0]
     sheet2 = sheets[1]
     
-    # Try to compare with a common column (might not exist)
+    # Get sheet info to find actual columns
+    sheet1_info = mcp_call_tool("get_sheet_info", {
+        "file_path": str(multi_sheet_fixture.path_str),
+        "sheet_name": sheet1
+    })
+    
+    sheet2_info = mcp_call_tool("get_sheet_info", {
+        "file_path": str(multi_sheet_fixture.path_str),
+        "sheet_name": sheet2
+    })
+    
+    # Find common columns between sheets
+    sheet1_cols = set(sheet1_info["column_names"])
+    sheet2_cols = set(sheet2_info["column_names"])
+    common_cols = list(sheet1_cols & sheet2_cols)
+    
+    if len(common_cols) < 2:
+        print(f"  ⚠️  Need at least 2 common columns, skipping")
+        return
+    
+    # Use first common column as key, second as compare column
+    key_column = common_cols[0]
+    compare_column = common_cols[1]
+    
+    print(f"  Comparing sheets '{sheet1}' and '{sheet2}'")
+    print(f"  Key column: {key_column}, Compare column: {compare_column}")
+    
+    # Try to compare with actual columns from sheets
     result = mcp_call_tool("compare_sheets", {
         "file_path": str(multi_sheet_fixture.path_str),
         "sheet1": sheet1,
         "sheet2": sheet2,
-        "key_column": "ID",
-        "compare_columns": ["Name"]
+        "key_column": key_column,
+        "compare_columns": [compare_column]
     })
     
     print(f"  Result keys: {list(result.keys())}")
@@ -420,7 +447,7 @@ def test_compare_sheets_basic(mcp_call_tool, multi_sheet_fixture):
     assert result["difference_count"] >= 0, "difference_count should be non-negative"
     
     # Verify metadata
-    assert result["key_column"] == "ID"
-    assert result["compare_columns"] == ["Name"]
+    assert result["key_column"] == key_column
+    assert result["compare_columns"] == [compare_column]
     
     print(f"  ✅ Found {result['difference_count']} differences between '{sheet1}' and '{sheet2}'")

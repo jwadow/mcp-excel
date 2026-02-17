@@ -287,11 +287,20 @@ class DataOperations(BaseOperations):
             request.filters, formula_gen, column_indices
         )
 
+        # For count with no filters, we need target_range to generate formula like =COUNTA(A:A)
+        # Pick first column as reference for counting rows
+        target_range = None
+        if not request.filters and len(df.columns) > 0:
+            first_col = str(df.columns[0])
+            first_col_idx = 0
+            target_range = formula_gen._get_column_range(first_col, first_col_idx)
+
         # Generate formula (returns None if filters use operators not supported in Excel)
         formula = formula_gen.generate_from_filter(
             operation="count",
             filters=request.filters,
             column_ranges=column_ranges,
+            target_range=target_range,
             column_types=column_types,
         )
 

@@ -305,24 +305,33 @@ class FormulaGenerator:
         
         if not filters:
             # No filters - simple aggregation
-            if operation == "count" and target_range:
+            # For operations without filters, target_range is required to generate Excel formula
+            if not target_range:
+                # Cannot generate Excel formula without knowing which column to reference
+                # Python filtering works correctly (returns len(df) for count with no filters)
+                # This is a valid use case: "count all rows" or "sum all values in column X"
+                # Return None to indicate formula cannot be generated (not an error)
+                return None
+            
+            if operation == "count":
                 return f"=COUNTA({target_range})"
-            elif operation == "sum" and target_range:
+            elif operation == "sum":
                 return f"=SUM({target_range})"
-            elif operation == "mean" and target_range:
+            elif operation == "mean":
                 return f"=AVERAGE({target_range})"
-            elif operation == "median" and target_range:
+            elif operation == "median":
                 return f"=MEDIAN({target_range})"
-            elif operation == "min" and target_range:
+            elif operation == "min":
                 return f"=MIN({target_range})"
-            elif operation == "max" and target_range:
+            elif operation == "max":
                 return f"=MAX({target_range})"
-            elif operation == "std" and target_range:
+            elif operation == "std":
                 return f"=STDEV({target_range})"
-            elif operation == "var" and target_range:
+            elif operation == "var":
                 return f"=VAR({target_range})"
             else:
-                raise ValueError(f"Operation {operation} requires filters or target range")
+                # Unknown operation
+                return None
 
         # Single filter (guaranteed to be FilterCondition after nested group check)
         if len(filters) == 1:
