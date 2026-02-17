@@ -22,7 +22,7 @@ from ..models.responses import FileMetadata, PerformanceMetrics
 DEFAULT_COLUMN_LIMIT = 5      # Columns returned when not specified
 DEFAULT_ROW_LIMIT = 50        # Default limit for rows
 MAX_ROW_LIMIT = 1000          # Maximum rows per request (hard cap)
-MAX_RESPONSE_CHARS = 10_000   # ~4k tokens for text
+MAX_RESPONSE_CHARS = 15_000   # ~6k tokens for text
 MAX_DIFFERENCES = 500         # Maximum differences in compare_sheets
 
 
