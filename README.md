@@ -9,7 +9,7 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/tools-23-orange.svg)](#available-tools)
+[![Tools](https://img.shields.io/badge/tools-25-orange.svg)](#available-tools)
 [![Sponsor](https://img.shields.io/badge/💖_Sponsor-Support_Development-ff69b4)](#-support-the-project)
 
 Enables AI agents to analyze Excel files through composable operations without loading raw data into context
@@ -137,7 +137,7 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 
 **Important:** Replace `C:/Users/YourName/Documents/data.xlsx` with the actual path to your Excel file.
 
-## Available Tools (24)
+## Available Tools (25)
 
 ### `inspect_file`
 
@@ -356,6 +356,53 @@ Count rows for multiple filter sets in a single call. Optimized for classificati
 - Performance metrics
 
 **Use case:** Much faster than multiple `filter_and_count` calls when you need to classify data into multiple categories. Loads file once, applies all filter sets, returns all counts in a single response.
+
+</details>
+
+### `analyze_overlap`
+
+Analyze overlap between multiple filter sets (Venn diagram analysis). Returns intersection counts, union, and exclusive zones.
+
+<details>
+<summary>View Input/Output</summary>
+
+**Input:**
+```json
+{
+  "file_path": "/path/to/file.xlsx",
+  "sheet_name": "Sales",
+  "filter_sets": [
+    {
+      "label": "VIP Customers",
+      "filters": [
+        {"column": "CustomerType", "operator": "==", "value": "VIP"}
+      ]
+    },
+    {
+      "label": "Active Users",
+      "filters": [
+        {"column": "LastPurchase", "operator": ">=", "value": "2024-01-01"}
+      ]
+    }
+  ]
+}
+```
+
+**Output:**
+- Set information (count, percentage for each set)
+- Pairwise intersections (A ∩ B, A ∩ C, etc.)
+- Union count and percentage
+- Venn diagram data (for 2 or 3 sets)
+- TSV output for Excel
+- Performance metrics
+
+**Use case:** Optimized for classification, segmentation, and cross-sell analysis. Much faster than multiple separate calls (loads file once, applies all filters). Ideal for overlap analysis, Venn diagrams, market segmentation, finding customers who are both VIP AND active, analyzing product category overlaps, checking data consistency.
+
+**Examples:**
+- Find customers who are both VIP AND active
+- Analyze overlap between product categories
+- Segment users by multiple criteria
+- Check data consistency (orders completed BUT no completion date)
 
 </details>
 

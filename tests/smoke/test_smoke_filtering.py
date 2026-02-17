@@ -697,3 +697,201 @@ def test_filter_and_count_batch_with_sample_rows(mcp_call_tool, simple_fixture):
             print(f"  {filter_result['label']}: {filter_result['count']} rows, no samples")
     
     print(f"  ✅ Batch with sample_rows works!")
+
+
+# ============================================================================
+# ANALYZE_OVERLAP SMOKE TESTS
+# ============================================================================
+
+def test_smoke_analyze_overlap_basic(mcp_call_tool, simple_fixture):
+    """Smoke: analyze_overlap with 2 sets (basic Venn diagram).
+    
+    Verifies:
+    - Basic overlap analysis works
+    - Returns sets, intersections, union
+    - Venn diagram for 2 sets is generated
+    """
+    print(f"\n🔍 Testing analyze_overlap (2 sets)...")
+    
+    # Get values for filters
+    unique_result = mcp_call_tool("get_unique_values", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "column": simple_fixture.columns[0],
+        "limit": 2
+    })
+    
+    if unique_result["count"] < 2:
+        print(f"  ⚠️  Need at least 2 unique values, skipping")
+        return
+    
+    val1 = unique_result["values"][0]
+    val2 = unique_result["values"][1]
+    
+    print(f"  Analyzing overlap: Set A ({simple_fixture.columns[0]}=='{val1}') vs Set B ({simple_fixture.columns[0]}=='{val2}')")
+    
+    result = mcp_call_tool("analyze_overlap", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "filter_sets": [
+            {
+                "label": "Set A",
+                "filters": [{"column": simple_fixture.columns[0], "operator": "==", "value": val1}]
+            },
+            {
+                "label": "Set B",
+                "filters": [{"column": simple_fixture.columns[0], "operator": "==", "value": val2}]
+            }
+        ]
+    })
+    
+    print(f"  Result keys: {list(result.keys())}")
+    
+    # Verify ALL required fields from AnalyzeOverlapResponse
+    assert "sets" in result, "Missing 'sets'"
+    assert "pairwise_intersections" in result, "Missing 'pairwise_intersections'"
+    assert "union_count" in result, "Missing 'union_count'"
+    assert "union_percentage" in result, "Missing 'union_percentage'"
+    assert "venn_diagram_2" in result, "Missing 'venn_diagram_2'"
+    assert "venn_diagram_3" in result, "Missing 'venn_diagram_3'"
+    assert "excel_output" in result, "Missing 'excel_output'"
+    assert "metadata" in result, "Missing 'metadata'"
+    assert "performance" in result, "Missing 'performance'"
+    
+    # Verify sets
+    assert isinstance(result["sets"], dict), "sets should be dict"
+    assert "Set A" in result["sets"], "Should have Set A"
+    assert "Set B" in result["sets"], "Should have Set B"
+    
+    set_a = result["sets"]["Set A"]
+    set_b = result["sets"]["Set B"]
+    
+    assert "count" in set_a, "Set A should have count"
+    assert "percentage" in set_a, "Set A should have percentage"
+    assert isinstance(set_a["count"], int), "Set A count should be int"
+    
+    print(f"  Set A: {set_a['count']} rows ({set_a['percentage']}%)")
+    print(f"  Set B: {set_b['count']} rows ({set_b['percentage']}%)")
+    
+    # Verify pairwise intersections
+    assert isinstance(result["pairwise_intersections"], dict), "pairwise_intersections should be dict"
+    assert "Set A ∩ Set B" in result["pairwise_intersections"], "Should have A ∩ B"
+    intersection = result["pairwise_intersections"]["Set A ∩ Set B"]
+    print(f"  Intersection: {intersection}")
+    
+    # Verify union
+    assert isinstance(result["union_count"], int), "union_count should be int"
+    assert result["union_count"] >= 0, "union_count should be non-negative"
+    print(f"  Union: {result['union_count']} rows ({result['union_percentage']}%)")
+    
+    # Verify Venn diagram for 2 sets
+    assert result["venn_diagram_2"] is not None, "Should have Venn diagram for 2 sets"
+    venn2 = result["venn_diagram_2"]
+    assert "A_only" in venn2, "Venn diagram should have A_only"
+    assert "B_only" in venn2, "Venn diagram should have B_only"
+    assert "A_and_B" in venn2, "Venn diagram should have A_and_B"
+    
+    print(f"  Venn diagram: A_only={venn2['A_only']}, B_only={venn2['B_only']}, A∩B={venn2['A_and_B']}")
+    
+    # Verify venn_diagram_3 is None for 2 sets
+    assert result["venn_diagram_3"] is None, "Should not have 3-set Venn for 2 sets"
+    
+    # Verify excel_output
+    excel_output = result["excel_output"]
+    assert "tsv" in excel_output, "excel_output missing 'tsv'"
+    assert excel_output["tsv"], "TSV should not be empty"
+    
+    print(f"  ✅ Overlap analysis works! Union formula: A + B - intersection = {set_a['count']} + {set_b['count']} - {intersection} = {result['union_count']}")
+
+
+def test_smoke_analyze_overlap_three_sets(mcp_call_tool, simple_fixture):
+    """Smoke: analyze_overlap with 3 sets (full Venn diagram).
+    
+    Verifies:
+    - 3-set overlap analysis works
+    - All pairwise intersections calculated
+    - Venn diagram for 3 sets is generated (7 zones)
+    """
+    print(f"\n🔍 Testing analyze_overlap (3 sets)...")
+    
+    # Get values for filters
+    unique_result = mcp_call_tool("get_unique_values", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "column": simple_fixture.columns[0],
+        "limit": 3
+    })
+    
+    if unique_result["count"] < 3:
+        print(f"  ⚠️  Need at least 3 unique values, skipping")
+        return
+    
+    val1 = unique_result["values"][0]
+    val2 = unique_result["values"][1]
+    val3 = unique_result["values"][2]
+    
+    print(f"  Analyzing overlap: 3 sets from {simple_fixture.columns[0]}")
+    
+    result = mcp_call_tool("analyze_overlap", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "filter_sets": [
+            {
+                "label": "A",
+                "filters": [{"column": simple_fixture.columns[0], "operator": "==", "value": val1}]
+            },
+            {
+                "label": "B",
+                "filters": [{"column": simple_fixture.columns[0], "operator": "==", "value": val2}]
+            },
+            {
+                "label": "C",
+                "filters": [{"column": simple_fixture.columns[0], "operator": "==", "value": val3}]
+            }
+        ]
+    })
+    
+    # Verify sets
+    assert len(result["sets"]) == 3, "Should have 3 sets"
+    assert "A" in result["sets"], "Should have Set A"
+    assert "B" in result["sets"], "Should have Set B"
+    assert "C" in result["sets"], "Should have Set C"
+    
+    print(f"  Set A: {result['sets']['A']['count']} rows")
+    print(f"  Set B: {result['sets']['B']['count']} rows")
+    print(f"  Set C: {result['sets']['C']['count']} rows")
+    
+    # Verify pairwise intersections (should have 3: A∩B, A∩C, B∩C)
+    assert len(result["pairwise_intersections"]) == 3, "Should have 3 pairwise intersections"
+    assert "A ∩ B" in result["pairwise_intersections"], "Should have A ∩ B"
+    assert "A ∩ C" in result["pairwise_intersections"], "Should have A ∩ C"
+    assert "B ∩ C" in result["pairwise_intersections"], "Should have B ∩ C"
+    
+    print(f"  Pairwise: A∩B={result['pairwise_intersections']['A ∩ B']}, A∩C={result['pairwise_intersections']['A ∩ C']}, B∩C={result['pairwise_intersections']['B ∩ C']}")
+    
+    # Verify Venn diagram for 3 sets (7 zones)
+    assert result["venn_diagram_3"] is not None, "Should have Venn diagram for 3 sets"
+    venn3 = result["venn_diagram_3"]
+    
+    assert "A_only" in venn3, "Venn diagram should have A_only"
+    assert "B_only" in venn3, "Venn diagram should have B_only"
+    assert "C_only" in venn3, "Venn diagram should have C_only"
+    assert "A_and_B_only" in venn3, "Venn diagram should have A_and_B_only"
+    assert "A_and_C_only" in venn3, "Venn diagram should have A_and_C_only"
+    assert "B_and_C_only" in venn3, "Venn diagram should have B_and_C_only"
+    assert "A_and_B_and_C" in venn3, "Venn diagram should have A_and_B_and_C"
+    
+    print(f"  Venn zones (7): A_only={venn3['A_only']}, B_only={venn3['B_only']}, C_only={venn3['C_only']}")
+    print(f"               A∩B_only={venn3['A_and_B_only']}, A∩C_only={venn3['A_and_C_only']}, B∩C_only={venn3['B_and_C_only']}")
+    print(f"               A∩B∩C={venn3['A_and_B_and_C']}")
+    
+    # Verify venn_diagram_2 is None for 3 sets
+    assert result["venn_diagram_2"] is None, "Should not have 2-set Venn for 3 sets"
+    
+    # Verify all zones sum to union
+    total_zones = (venn3["A_only"] + venn3["B_only"] + venn3["C_only"] +
+                   venn3["A_and_B_only"] + venn3["A_and_C_only"] + venn3["B_and_C_only"] +
+                   venn3["A_and_B_and_C"])
+    assert total_zones == result["union_count"], f"All Venn zones should sum to union: {total_zones} != {result['union_count']}"
+    
+    print(f"  ✅ 3-set overlap analysis works! Union: {result['union_count']} rows")

@@ -45,7 +45,7 @@ def test_server_initialization(mcp_server):
 # ============================================================================
 
 def test_list_tools_returns_all_tools(mcp_server):
-    """Smoke: Server returns complete list of 24 tools.
+    """Smoke: Server returns complete list of 25 tools.
     
     This verifies that all tools are registered correctly in main.py.
     """
@@ -55,7 +55,7 @@ def test_list_tools_returns_all_tools(mcp_server):
     print(f"  Found {len(tools)} tools")
     
     # Verify count
-    assert len(tools) == 24, f"Expected 24 tools, got {len(tools)}"
+    assert len(tools) == 25, f"Expected 25 tools, got {len(tools)}"
     
     # Verify all expected tools are present
     expected_tools = {
@@ -69,9 +69,10 @@ def test_list_tools_returns_all_tools(mcp_server):
         "get_unique_values",
         "get_value_counts",
         "filter_and_get_rows",
-        # Filtering and counting (2)
+        # Filtering and counting (3)
         "filter_and_count",
         "filter_and_count_batch",
+        "analyze_overlap",
         # Aggregation (2)
         "aggregate",
         "group_by",
@@ -106,7 +107,7 @@ def test_list_tools_returns_all_tools(mcp_server):
     if unexpected:
         pytest.fail(f"Unexpected tools: {unexpected}")
     
-    print(f"  ✅ All 24 tools present")
+    print(f"  ✅ All 25 tools present")
 
 
 def test_all_tools_have_required_fields(mcp_server):
@@ -181,6 +182,7 @@ def test_filter_tools_have_definitions_at_root(mcp_server):
     filter_tools = {
         "filter_and_count",
         "filter_and_count_batch",
+        "analyze_overlap",
         "filter_and_get_rows",
         "aggregate",
         "group_by",

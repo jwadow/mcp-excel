@@ -14,6 +14,7 @@ from ..excel.formula_generator import FormulaGenerator
 from ..excel.tsv_formatter import TSVFormatter
 from ..models.requests import (
     AggregateRequest,
+    AnalyzeOverlapRequest,
     FilterAndCountBatchRequest,
     FilterAndCountRequest,
     FilterAndGetRowsRequest,
@@ -25,6 +26,7 @@ from ..models.requests import (
 )
 from ..models.responses import (
     AggregateResponse,
+    AnalyzeOverlapResponse,
     ExcelOutput,
     FilterAndCountBatchResponse,
     FilterAndCountResponse,
@@ -33,6 +35,9 @@ from ..models.responses import (
     GetUniqueValuesResponse,
     GetValueCountsResponse,
     GroupByResponse,
+    SetInfo,
+    VennDiagram2,
+    VennDiagram3,
 )
 from ..operations.base import BaseOperations
 from ..operations.filtering import FilterEngine
@@ -781,3 +786,184 @@ class DataOperations(BaseOperations):
         )
 
         return response
+
+    def analyze_overlap(
+        self, request: AnalyzeOverlapRequest
+    ) -> AnalyzeOverlapResponse:
+        """Analyze overlap between multiple filter sets (Venn diagram analysis).
+
+        Args:
+            request: Analyze overlap request
+
+        Returns:
+            Analyze overlap response
+        """
+        start_time = time.time()
+
+        # Load DataFrame ONCE
+        df, _ = self._load_with_header_detection(
+            request.file_path, request.sheet_name, request.header_row
+        )
+
+        total_rows = len(df)
+
+        # Validate ALL filter sets BEFORE execution
+        for i, filter_set in enumerate(request.filter_sets):
+            is_valid, error_msg = self._filter_engine.validate_filters(
+                df, filter_set.filters
+            )
+            if not is_valid:
+                label = filter_set.label or f"Set {i+1}"
+                raise ValueError(f"Filter set '{label}': {error_msg}")
+
+        # Build masks for each filter set
+        masks = []
+        labels = []
+        counts = []
+
+        for i, filter_set in enumerate(request.filter_sets):
+            label = filter_set.label or f"Set {i+1}"
+            labels.append(label)
+
+            # Build mask using FilterEngine public API
+            if filter_set.filters:
+                # Apply filters to get filtered DataFrame
+                filtered_df = self._filter_engine.apply_filters(df, filter_set.filters, filter_set.logic)
+                # Create boolean mask by checking which indices are in filtered DataFrame
+                mask = df.index.isin(filtered_df.index)
+            else:
+                # Empty filter set - all rows
+                mask = pd.Series([True] * len(df), index=df.index)
+
+            masks.append(mask)
+            counts.append(int(mask.sum()))
+
+        # Calculate union
+        union_mask = masks[0]
+        for mask in masks[1:]:
+            union_mask = union_mask | mask
+        union_count = int(union_mask.sum())
+        union_percentage = (union_count / total_rows * 100) if total_rows > 0 else 0.0
+
+        # Build set info
+        sets_info = {}
+        for label, count in zip(labels, counts):
+            percentage = (count / total_rows * 100) if total_rows > 0 else 0.0
+            sets_info[label] = SetInfo(
+                label=label,
+                count=count,
+                percentage=round(percentage, 2)
+            )
+
+        # Calculate pairwise intersections
+        pairwise_intersections = {}
+        n_sets = len(masks)
+
+        for i in range(n_sets):
+            for j in range(i + 1, n_sets):
+                intersection_mask = masks[i] & masks[j]
+                intersection_count = int(intersection_mask.sum())
+                key = f"{labels[i]} ∩ {labels[j]}"
+                pairwise_intersections[key] = intersection_count
+
+        # Calculate Venn diagrams for 2 or 3 sets
+        venn_diagram_2 = None
+        venn_diagram_3 = None
+
+        if n_sets == 2:
+            # Full Venn diagram for 2 sets
+            intersection_AB = int((masks[0] & masks[1]).sum())
+            A_only = counts[0] - intersection_AB
+            B_only = counts[1] - intersection_AB
+
+            venn_diagram_2 = VennDiagram2(
+                A_only=A_only,
+                B_only=B_only,
+                A_and_B=intersection_AB
+            )
+
+        elif n_sets == 3:
+            # Full Venn diagram for 3 sets (7 zones)
+            intersection_AB = int((masks[0] & masks[1]).sum())
+            intersection_AC = int((masks[0] & masks[2]).sum())
+            intersection_BC = int((masks[1] & masks[2]).sum())
+            intersection_ABC = int((masks[0] & masks[1] & masks[2]).sum())
+
+            # Calculate exclusive zones
+            A_and_B_only = intersection_AB - intersection_ABC
+            A_and_C_only = intersection_AC - intersection_ABC
+            B_and_C_only = intersection_BC - intersection_ABC
+
+            A_only = counts[0] - intersection_AB - intersection_AC + intersection_ABC
+            B_only = counts[1] - intersection_AB - intersection_BC + intersection_ABC
+            C_only = counts[2] - intersection_AC - intersection_BC + intersection_ABC
+
+            venn_diagram_3 = VennDiagram3(
+                A_only=A_only,
+                B_only=B_only,
+                C_only=C_only,
+                A_and_B_only=A_and_B_only,
+                A_and_C_only=A_and_C_only,
+                B_and_C_only=B_and_C_only,
+                A_and_B_and_C=intersection_ABC
+            )
+
+        # Generate TSV output
+        if n_sets == 2:
+            # Special format for 2 sets with Venn diagram
+            headers = ["Set", "Count", "Only", "Intersection"]
+            rows = [
+                [labels[0], counts[0], venn_diagram_2.A_only, venn_diagram_2.A_and_B],
+                [labels[1], counts[1], venn_diagram_2.B_only, venn_diagram_2.A_and_B],
+                ["Union", union_count, "", ""]
+            ]
+        elif n_sets == 3:
+            # Special format for 3 sets with Venn diagram
+            headers = ["Zone", "Count"]
+            rows = [
+                [f"{labels[0]} only", venn_diagram_3.A_only],
+                [f"{labels[1]} only", venn_diagram_3.B_only],
+                [f"{labels[2]} only", venn_diagram_3.C_only],
+                [f"{labels[0]} ∩ {labels[1]} only", venn_diagram_3.A_and_B_only],
+                [f"{labels[0]} ∩ {labels[2]} only", venn_diagram_3.A_and_C_only],
+                [f"{labels[1]} ∩ {labels[2]} only", venn_diagram_3.B_and_C_only],
+                [f"{labels[0]} ∩ {labels[1]} ∩ {labels[2]}", venn_diagram_3.A_and_B_and_C],
+                ["", ""],
+                ["Union", union_count]
+            ]
+        else:
+            # General format for 4+ sets
+            headers = ["Set", "Count", "Percentage"]
+            rows = [[label, count, f"{sets_info[label].percentage}%"] for label, count in zip(labels, counts)]
+            rows.append(["", "", ""])
+            rows.append(["Pairwise Intersections", "", ""])
+            for key, count in pairwise_intersections.items():
+                rows.append([key, count, ""])
+            rows.append(["", "", ""])
+            rows.append(["Union", union_count, f"{union_percentage:.2f}%"])
+
+        tsv = self._tsv_formatter.format_table(headers, rows)
+
+        excel_output = ExcelOutput(
+            tsv=tsv,
+            formula=None,
+            references=None
+        )
+
+        metadata = self._get_file_metadata(request.file_path, request.sheet_name)
+        metadata.rows_total = total_rows
+        metadata.columns_total = len(df.columns)
+
+        performance = self._get_performance_metrics(start_time, total_rows, True)
+
+        return AnalyzeOverlapResponse(
+            sets=sets_info,
+            pairwise_intersections=pairwise_intersections,
+            union_count=union_count,
+            union_percentage=round(union_percentage, 2),
+            venn_diagram_2=venn_diagram_2,
+            venn_diagram_3=venn_diagram_3,
+            excel_output=excel_output,
+            metadata=metadata,
+            performance=performance,
+        )

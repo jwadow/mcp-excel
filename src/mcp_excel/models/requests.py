@@ -306,3 +306,12 @@ class GetDataProfileRequest(BaseModel):
     columns: Optional[list[str]] = Field(default=None, description="Columns to profile (None = all columns)")
     top_n: int = Field(default=5, description="Number of top values to return per column")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+
+
+class AnalyzeOverlapRequest(BaseModel):
+    """Request to analyze overlap between multiple filter sets (Venn diagram analysis)."""
+
+    file_path: str = Field(description="Absolute path to the Excel file")
+    sheet_name: str = Field(description="Name of the sheet")
+    filter_sets: list[FilterSet] = Field(description="List of filter sets to analyze overlap between", min_length=2, max_length=10)
+    header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")

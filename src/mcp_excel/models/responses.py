@@ -354,6 +354,48 @@ class FilterAndCountBatchResponse(BaseModel):
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
 
+class SetInfo(BaseModel):
+    """Information about a single set in overlap analysis."""
+
+    label: str = Field(description="Label of the set")
+    count: int = Field(description="Number of rows in this set")
+    percentage: float = Field(description="Percentage of total rows")
+
+
+class VennDiagram2(BaseModel):
+    """Venn diagram data for 2 sets."""
+
+    A_only: int = Field(description="Rows only in set A")
+    B_only: int = Field(description="Rows only in set B")
+    A_and_B: int = Field(description="Rows in both A and B (intersection)")
+
+
+class VennDiagram3(BaseModel):
+    """Venn diagram data for 3 sets."""
+
+    A_only: int = Field(description="Rows only in set A")
+    B_only: int = Field(description="Rows only in set B")
+    C_only: int = Field(description="Rows only in set C")
+    A_and_B_only: int = Field(description="Rows in A and B, but not C")
+    A_and_C_only: int = Field(description="Rows in A and C, but not B")
+    B_and_C_only: int = Field(description="Rows in B and C, but not A")
+    A_and_B_and_C: int = Field(description="Rows in all three sets")
+
+
+class AnalyzeOverlapResponse(BaseModel):
+    """Response for overlap analysis between filter sets."""
+
+    sets: dict[str, SetInfo] = Field(description="Information about each set (label -> info)")
+    pairwise_intersections: dict[str, int] = Field(description="All pairwise intersections (e.g., 'A ∩ B' -> count)")
+    union_count: int = Field(description="Total number of rows in union of all sets")
+    union_percentage: float = Field(description="Percentage of total rows in union")
+    venn_diagram_2: Optional[VennDiagram2] = Field(default=None, description="Venn diagram for 2 sets (if applicable)")
+    venn_diagram_3: Optional[VennDiagram3] = Field(default=None, description="Venn diagram for 3 sets (if applicable)")
+    excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    metadata: FileMetadata = Field(description="File metadata")
+    performance: PerformanceMetrics = Field(description="Performance metrics")
+
+
 class ErrorResponse(BaseModel):
     """Error response."""
 

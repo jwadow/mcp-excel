@@ -16,6 +16,7 @@ from mcp.types import Tool, TextContent
 from .core.file_loader import FileLoader
 from .models.requests import (
     AggregateRequest,
+    AnalyzeOverlapRequest,
     CalculateExpressionRequest,
     CalculateMovingAverageRequest,
     CalculatePeriodChangeRequest,
@@ -457,6 +458,52 @@ class MCPExcelServer:
                                         "sample_rows": {
                                             "type": "integer",
                                             "description": "Number of sample rows to return for this filter set (optional).",
+                                        }
+                                    },
+                                    "required": ["filters"]
+                                }
+                            },
+                            "header_row": {
+                                "type": "integer",
+                                "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                        },
+                        "definitions": FILTER_DEFINITIONS,
+                        "required": ["file_path", "sheet_name", "filter_sets"],
+                    },
+                ),
+                Tool(
+                    name="analyze_overlap",
+                    description="Analyze overlap between multiple filter sets (Venn diagram analysis). Returns intersection counts, union, and exclusive zones. Optimized for classification, segmentation, and cross-sell analysis. Much faster than multiple separate calls (loads file once, applies all filters). Use for: overlap analysis, Venn diagrams, classification into categories, market segmentation, cross-sell analysis, data consistency checks. EXAMPLES: Find customers who are both VIP AND active, Analyze overlap between product categories, Segment users by multiple criteria, Check data consistency (orders completed BUT no completion date).",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Absolute path to the Excel file",
+                            },
+                            "sheet_name": {
+                                "type": "string",
+                                "description": "Name of the sheet",
+                            },
+                            "filter_sets": {
+                                "type": "array",
+                                "description": "List of filter sets to analyze overlap between (2-10 sets). Each set is evaluated independently, then overlaps are calculated.",
+                                "minItems": 2,
+                                "maxItems": 10,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {
+                                            "type": "string",
+                                            "description": "Optional label for this filter set (e.g., 'VIP customers', 'Active users'). If not provided, will be labeled as 'Set 1', 'Set 2', etc."
+                                        },
+                                        "filters": FILTER_PROPERTY_SCHEMA,
+                                        "logic": {
+                                            "type": "string",
+                                            "enum": ["AND", "OR"],
+                                            "description": LOGIC_DESCRIPTION,
+                                            "default": "AND"
                                         }
                                     },
                                     "required": ["filters"]
@@ -1095,6 +1142,11 @@ class MCPExcelServer:
                 elif name == "filter_and_count_batch":
                     request = FilterAndCountBatchRequest(**arguments)
                     response = self.data_ops.filter_and_count_batch(request)
+                    return [TextContent(type="text", text=response.model_dump_json(indent=2))]
+
+                elif name == "analyze_overlap":
+                    request = AnalyzeOverlapRequest(**arguments)
+                    response = self.data_ops.analyze_overlap(request)
                     return [TextContent(type="text", text=response.model_dump_json(indent=2))]
 
                 elif name == "filter_and_get_rows":

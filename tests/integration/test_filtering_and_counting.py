@@ -2296,3 +2296,1451 @@ def test_filter_and_count_batch_with_sample_rows(simple_fixture, file_loader):
     
     # Set 3: should NOT have sample_rows (None)
     assert response.results[2].sample_rows is None, "Set 3 should not have samples"
+
+
+# ============================================================================
+# ANALYZE_OVERLAP TESTS - BASIC FUNCTIONALITY (2 SETS)
+# ============================================================================
+
+def test_analyze_overlap_two_sets_no_intersection(simple_fixture, file_loader):
+    """Test analyze_overlap with two non-intersecting sets.
+    
+    Verifies:
+    - Two sets with no overlap
+    - Union equals sum of counts
+    - Venn diagram for 2 sets is correct
+    """
+    print(f"\n🔍 Testing analyze_overlap: two sets, no intersection")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get two different values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    print(f"  Sets: A={simple_fixture.columns[0]}=='{values[0]}', B={simple_fixture.columns[0]}=='{values[1]}'")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Set A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="Set B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Set A: {response.sets['Set A'].count}, Set B: {response.sets['Set B'].count}")
+    print(f"   Intersection: {response.pairwise_intersections['Set A ∩ Set B']}")
+    print(f"   Union: {response.union_count}")
+    
+    assert len(response.sets) == 2, "Should have 2 sets"
+    assert "Set A" in response.sets, "Should have Set A"
+    assert "Set B" in response.sets, "Should have Set B"
+    
+    # No intersection (different values)
+    assert response.pairwise_intersections["Set A ∩ Set B"] == 0, "Should have no intersection"
+    
+    # Union should equal sum (no overlap)
+    assert response.union_count == response.sets["Set A"].count + response.sets["Set B"].count, "Union should equal sum"
+    
+    # Venn diagram for 2 sets
+    assert response.venn_diagram_2 is not None, "Should have Venn diagram for 2 sets"
+    assert response.venn_diagram_2.A_only == response.sets["Set A"].count, "A_only should equal Set A count"
+    assert response.venn_diagram_2.B_only == response.sets["Set B"].count, "B_only should equal Set B count"
+    assert response.venn_diagram_2.A_and_B == 0, "A_and_B should be 0"
+
+
+def test_analyze_overlap_two_sets_full_intersection(simple_fixture, file_loader):
+    """Test analyze_overlap with two identical sets (A = B).
+    
+    Verifies:
+    - Full intersection when sets are identical
+    - Union equals individual set count
+    - A_only and B_only are 0
+    """
+    print(f"\n🔍 Testing analyze_overlap: two sets, full intersection (A = B)")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get one value, use for both sets
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    value = ops.get_unique_values(unique_request).values[0]
+    
+    print(f"  Both sets: {simple_fixture.columns[0]}=='{value}'")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Set A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value)]),
+            FilterSet(label="Set B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value)])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Set A: {response.sets['Set A'].count}, Set B: {response.sets['Set B'].count}")
+    print(f"   Intersection: {response.pairwise_intersections['Set A ∩ Set B']}")
+    print(f"   Union: {response.union_count}")
+    
+    # Full intersection
+    count_a = response.sets["Set A"].count
+    assert response.pairwise_intersections["Set A ∩ Set B"] == count_a, "Intersection should equal set count"
+    assert response.union_count == count_a, "Union should equal set count"
+    
+    # Venn diagram
+    assert response.venn_diagram_2.A_only == 0, "A_only should be 0"
+    assert response.venn_diagram_2.B_only == 0, "B_only should be 0"
+    assert response.venn_diagram_2.A_and_B == count_a, "A_and_B should equal set count"
+
+
+def test_analyze_overlap_two_sets_partial_intersection(simple_fixture, file_loader):
+    """Test analyze_overlap with two sets having partial intersection.
+    
+    Verifies:
+    - Partial intersection is calculated correctly
+    - Union = A + B - intersection
+    - A_only and B_only are correct
+    """
+    print(f"\n🔍 Testing analyze_overlap: two sets, partial intersection")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Set A: column[1] > 0
+    # Set B: column[0] is_not_null
+    # Should have partial overlap
+    
+    print(f"  Set A: {simple_fixture.columns[1]} > 0")
+    print(f"  Set B: {simple_fixture.columns[0]} is_not_null")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Positive", filters=[FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)]),
+            FilterSet(label="Non-null", filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    count_a = response.sets["Positive"].count
+    count_b = response.sets["Non-null"].count
+    intersection = response.pairwise_intersections["Positive ∩ Non-null"]
+    union = response.union_count
+    
+    print(f"✅ Set A: {count_a}, Set B: {count_b}")
+    print(f"   Intersection: {intersection}, Union: {union}")
+    
+    # Verify formula: Union = A + B - Intersection
+    assert union == count_a + count_b - intersection, "Union formula should be correct"
+    
+    # Venn diagram
+    assert response.venn_diagram_2.A_only == count_a - intersection, "A_only should be correct"
+    assert response.venn_diagram_2.B_only == count_b - intersection, "B_only should be correct"
+    assert response.venn_diagram_2.A_and_B == intersection, "A_and_B should equal intersection"
+
+
+def test_analyze_overlap_two_sets_one_subset_of_other(simple_fixture, file_loader):
+    """Test analyze_overlap where A ⊂ B (A is subset of B).
+    
+    Verifies:
+    - Subset relationship is detected
+    - A_only = 0
+    - B_only = B - A
+    - Intersection = A
+    """
+    print(f"\n🔍 Testing analyze_overlap: A ⊂ B (subset)")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get a value for Set A
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    value = ops.get_unique_values(unique_request).values[0]
+    
+    # Set A: specific value (subset)
+    # Set B: is_not_null (superset)
+    
+    print(f"  Set A: {simple_fixture.columns[0]}=='{value}' (subset)")
+    print(f"  Set B: {simple_fixture.columns[0]} is_not_null (superset)")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Specific", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value)]),
+            FilterSet(label="All", filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    count_a = response.sets["Specific"].count
+    count_b = response.sets["All"].count
+    intersection = response.pairwise_intersections["Specific ∩ All"]
+    
+    print(f"✅ Set A: {count_a}, Set B: {count_b}")
+    print(f"   Intersection: {intersection}")
+    
+    # A is subset of B, so intersection = A
+    assert intersection == count_a, "Intersection should equal subset count"
+    assert response.union_count == count_b, "Union should equal superset count"
+    
+    # Venn diagram
+    assert response.venn_diagram_2.A_only == 0, "A_only should be 0 (A is subset)"
+    assert response.venn_diagram_2.B_only == count_b - count_a, "B_only should be B - A"
+    assert response.venn_diagram_2.A_and_B == count_a, "A_and_B should equal A"
+
+
+def test_analyze_overlap_three_sets_no_intersections(simple_fixture, file_loader):
+    """Test analyze_overlap with three non-intersecting sets.
+    
+    Verifies:
+    - Three sets with no overlap
+    - All pairwise intersections are 0
+    - Union equals sum of counts
+    - Venn diagram for 3 sets is correct
+    """
+    print(f"\n🔍 Testing analyze_overlap: three sets, no intersections")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get three different values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=3
+    )
+    values = ops.get_unique_values(unique_request).values[:3]
+    
+    print(f"  Three disjoint sets from {simple_fixture.columns[0]}")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]),
+            FilterSet(label="C", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[2])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Set A: {response.sets['A'].count}, B: {response.sets['B'].count}, C: {response.sets['C'].count}")
+    print(f"   Union: {response.union_count}")
+    
+    assert len(response.sets) == 3, "Should have 3 sets"
+    
+    # All pairwise intersections should be 0
+    assert response.pairwise_intersections["A ∩ B"] == 0, "A ∩ B should be 0"
+    assert response.pairwise_intersections["A ∩ C"] == 0, "A ∩ C should be 0"
+    assert response.pairwise_intersections["B ∩ C"] == 0, "B ∩ C should be 0"
+    
+    # Union should equal sum
+    total = response.sets["A"].count + response.sets["B"].count + response.sets["C"].count
+    assert response.union_count == total, "Union should equal sum"
+    
+    # Venn diagram for 3 sets
+    assert response.venn_diagram_3 is not None, "Should have Venn diagram for 3 sets"
+    assert response.venn_diagram_3.A_only == response.sets["A"].count, "A_only should equal A count"
+    assert response.venn_diagram_3.B_only == response.sets["B"].count, "B_only should equal B count"
+    assert response.venn_diagram_3.C_only == response.sets["C"].count, "C_only should equal C count"
+    assert response.venn_diagram_3.A_and_B_only == 0, "A_and_B_only should be 0"
+    assert response.venn_diagram_3.A_and_C_only == 0, "A_and_C_only should be 0"
+    assert response.venn_diagram_3.B_and_C_only == 0, "B_and_C_only should be 0"
+    assert response.venn_diagram_3.A_and_B_and_C == 0, "A_and_B_and_C should be 0"
+
+
+def test_analyze_overlap_three_sets_all_intersect(numeric_types_fixture, file_loader):
+    """Test analyze_overlap with three sets that all intersect.
+    
+    Verifies:
+    - All three sets have common elements
+    - Triple intersection (A ∩ B ∩ C) is calculated
+    - Venn diagram zones are correct
+    """
+    print(f"\n🔍 Testing analyze_overlap: three sets, all intersect")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Set A: Количество > 50
+    # Set B: Количество < 150
+    # Set C: Цена > 0
+    # Should have triple intersection
+    
+    print(f"  Set A: Количество > 50")
+    print(f"  Set B: Количество < 150")
+    print(f"  Set C: Цена > 0")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column="Количество", operator=">", value=50)]),
+            FilterSet(label="B", filters=[FilterCondition(column="Количество", operator="<", value=150)]),
+            FilterSet(label="C", filters=[FilterCondition(column="Цена", operator=">", value=0)])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Set A: {response.sets['A'].count}, B: {response.sets['B'].count}, C: {response.sets['C'].count}")
+    print(f"   Triple intersection: {response.venn_diagram_3.A_and_B_and_C}")
+    
+    # Should have triple intersection (50 < Количество < 150 AND Цена > 0)
+    assert response.venn_diagram_3.A_and_B_and_C > 0, "Should have triple intersection"
+    
+    # Verify all zones sum to union
+    venn = response.venn_diagram_3
+    total_zones = (venn.A_only + venn.B_only + venn.C_only +
+                   venn.A_and_B_only + venn.A_and_C_only + venn.B_and_C_only +
+                   venn.A_and_B_and_C)
+    assert total_zones == response.union_count, "All Venn zones should sum to union"
+
+
+def test_analyze_overlap_three_sets_pairwise_only(simple_fixture, file_loader):
+    """Test analyze_overlap with three sets having pairwise intersections but no triple.
+    
+    Verifies:
+    - Pairwise intersections exist
+    - Triple intersection is 0
+    - Venn diagram correctly shows pairwise-only zones
+    """
+    print(f"\n🔍 Testing analyze_overlap: three sets, pairwise only (no triple)")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=3
+    )
+    values = ops.get_unique_values(unique_request).values[:3]
+    
+    # Set A: value[0] OR value[1]
+    # Set B: value[1] OR value[2]
+    # Set C: value[0] OR value[2]
+    # Pairwise intersections exist, but no triple
+    
+    print(f"  Creating sets with pairwise intersections only")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="in", values=[values[0], values[1]])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="in", values=[values[1], values[2]])]),
+            FilterSet(label="C", filters=[FilterCondition(column=simple_fixture.columns[0], operator="in", values=[values[0], values[2]])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Pairwise intersections:")
+    print(f"   A ∩ B: {response.pairwise_intersections['A ∩ B']}")
+    print(f"   A ∩ C: {response.pairwise_intersections['A ∩ C']}")
+    print(f"   B ∩ C: {response.pairwise_intersections['B ∩ C']}")
+    print(f"   Triple: {response.venn_diagram_3.A_and_B_and_C}")
+    
+    # Should have pairwise intersections
+    assert response.pairwise_intersections["A ∩ B"] > 0, "A ∩ B should exist"
+    assert response.pairwise_intersections["A ∩ C"] > 0, "A ∩ C should exist"
+    assert response.pairwise_intersections["B ∩ C"] > 0, "B ∩ C should exist"
+    
+    # Triple intersection should be 0 (no value in all three)
+    assert response.venn_diagram_3.A_and_B_and_C == 0, "Triple intersection should be 0"
+
+
+def test_analyze_overlap_three_sets_full_venn(numeric_types_fixture, file_loader):
+    """Test analyze_overlap with all 7 zones of Venn diagram filled.
+    
+    Verifies:
+    - All 7 zones have non-zero counts
+    - Complex overlap scenario is handled correctly
+    """
+    print(f"\n🔍 Testing analyze_overlap: three sets, all 7 Venn zones filled")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Create sets that fill all zones:
+    # Set A: Количество >= 50
+    # Set B: Количество <= 150
+    # Set C: Цена >= 100
+    
+    print(f"  Set A: Количество >= 50")
+    print(f"  Set B: Количество <= 150")
+    print(f"  Set C: Цена >= 100")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column="Количество", operator=">=", value=50)]),
+            FilterSet(label="B", filters=[FilterCondition(column="Количество", operator="<=", value=150)]),
+            FilterSet(label="C", filters=[FilterCondition(column="Цена", operator=">=", value=100)])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    venn = response.venn_diagram_3
+    print(f"✅ Venn zones:")
+    print(f"   A only: {venn.A_only}")
+    print(f"   B only: {venn.B_only}")
+    print(f"   C only: {venn.C_only}")
+    print(f"   A∩B only: {venn.A_and_B_only}")
+    print(f"   A∩C only: {venn.A_and_C_only}")
+    print(f"   B∩C only: {venn.B_and_C_only}")
+    print(f"   A∩B∩C: {venn.A_and_B_and_C}")
+    
+    # Verify all zones sum to union
+    total = (venn.A_only + venn.B_only + venn.C_only +
+             venn.A_and_B_only + venn.A_and_C_only + venn.B_and_C_only +
+             venn.A_and_B_and_C)
+    assert total == response.union_count, "All zones should sum to union"
+    
+    # Verify set counts
+    count_a = venn.A_only + venn.A_and_B_only + venn.A_and_C_only + venn.A_and_B_and_C
+    assert count_a == response.sets["A"].count, "A zones should sum to A count"
+
+
+def test_analyze_overlap_four_sets(simple_fixture, file_loader):
+    """Test analyze_overlap with 4 sets.
+    
+    Verifies:
+    - Handles 4 sets correctly
+    - Pairwise intersections calculated (6 pairs)
+    - No Venn diagram for 4+ sets
+    - TSV output format for 4+ sets
+    """
+    print(f"\n🔍 Testing analyze_overlap: four sets")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get four values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=4
+    )
+    values = ops.get_unique_values(unique_request).values[:4]
+    
+    print(f"  Four sets from {simple_fixture.columns[0]}")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]),
+            FilterSet(label="C", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[2])]),
+            FilterSet(label="D", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[3])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Four sets processed")
+    print(f"   Pairwise intersections: {len(response.pairwise_intersections)}")
+    
+    assert len(response.sets) == 4, "Should have 4 sets"
+    
+    # Should have 6 pairwise intersections (C(4,2) = 6)
+    assert len(response.pairwise_intersections) == 6, "Should have 6 pairwise intersections"
+    assert "A ∩ B" in response.pairwise_intersections
+    assert "A ∩ C" in response.pairwise_intersections
+    assert "A ∩ D" in response.pairwise_intersections
+    assert "B ∩ C" in response.pairwise_intersections
+    assert "B ∩ D" in response.pairwise_intersections
+    assert "C ∩ D" in response.pairwise_intersections
+    
+    # No Venn diagrams for 4+ sets
+    assert response.venn_diagram_2 is None, "Should not have 2-set Venn for 4 sets"
+    assert response.venn_diagram_3 is None, "Should not have 3-set Venn for 4 sets"
+    
+    # TSV should be in general format
+    assert "Pairwise Intersections" in response.excel_output.tsv, "TSV should have pairwise section"
+
+
+def test_analyze_overlap_ten_sets_maximum(simple_fixture, file_loader):
+    """Test analyze_overlap with maximum 10 sets.
+    
+    Verifies:
+    - Handles maximum 10 sets
+    - Pairwise intersections calculated (45 pairs)
+    - Performance is acceptable
+    """
+    print(f"\n🔍 Testing analyze_overlap: ten sets (maximum)")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Create 10 filter sets (all is_not_null for simplicity)
+    filter_sets = []
+    for i in range(10):
+        filter_sets.append(
+            FilterSet(
+                label=f"Set {i+1}",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")]
+            )
+        )
+    
+    print(f"  Ten sets (maximum allowed)")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=filter_sets
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Ten sets processed")
+    print(f"   Pairwise intersections: {len(response.pairwise_intersections)}")
+    print(f"   Performance: {response.performance.execution_time_ms}ms")
+    
+    assert len(response.sets) == 10, "Should have 10 sets"
+    
+    # Should have 45 pairwise intersections (C(10,2) = 45)
+    assert len(response.pairwise_intersections) == 45, "Should have 45 pairwise intersections"
+    
+    # Performance should be reasonable
+    assert response.performance.execution_time_ms < 5000, "Should complete in reasonable time"
+
+
+def test_analyze_overlap_pairwise_intersections_count(simple_fixture, file_loader):
+    """Test analyze_overlap calculates all pairwise intersections correctly.
+    
+    Verifies:
+    - For N sets, calculates C(N,2) pairwise intersections
+    - All pairs are present in response
+    """
+    print(f"\n🔍 Testing analyze_overlap: pairwise intersections count")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get 5 values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=5
+    )
+    values = ops.get_unique_values(unique_request).values[:5]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label=f"Set {i+1}", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[i])])
+            for i in range(5)
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    # C(5,2) = 10 pairwise intersections
+    print(f"✅ Pairwise intersections: {len(response.pairwise_intersections)}")
+    assert len(response.pairwise_intersections) == 10, "Should have 10 pairwise intersections for 5 sets"
+
+
+# ============================================================================
+# ANALYZE_OVERLAP TESTS - FILTERS
+# ============================================================================
+
+def test_analyze_overlap_with_complex_filters(numeric_types_fixture, file_loader):
+    """Test analyze_overlap with complex filters (AND/OR logic).
+    
+    Verifies:
+    - Complex filters work in overlap analysis
+    - Multiple conditions per set
+    """
+    print(f"\n🔍 Testing analyze_overlap: complex filters")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Set A: Количество > 50 AND Количество < 100
+    # Set B: Цена > 100 AND Цена < 200
+    
+    print(f"  Set A: 50 < Количество < 100")
+    print(f"  Set B: 100 < Цена < 200")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Range A",
+                filters=[
+                    FilterCondition(column="Количество", operator=">", value=50),
+                    FilterCondition(column="Количество", operator="<", value=100)
+                ],
+                logic="AND"
+            ),
+            FilterSet(
+                label="Range B",
+                filters=[
+                    FilterCondition(column="Цена", operator=">", value=100),
+                    FilterCondition(column="Цена", operator="<", value=200)
+                ],
+                logic="AND"
+            )
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Set A: {response.sets['Range A'].count}, Set B: {response.sets['Range B'].count}")
+    print(f"   Intersection: {response.pairwise_intersections['Range A ∩ Range B']}")
+    
+    assert response.sets["Range A"].count >= 0, "Set A should have valid count"
+    assert response.sets["Range B"].count >= 0, "Set B should have valid count"
+
+
+def test_analyze_overlap_with_nested_filters(simple_fixture, file_loader):
+    """Test analyze_overlap with nested filter groups.
+    
+    Verifies:
+    - Nested groups work in overlap analysis
+    - Complex logical expressions
+    """
+    print(f"\n🔍 Testing analyze_overlap: nested filter groups")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, FilterGroup, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Set A: (col[0] == val[0]) OR (col[1] > 0)
+    # Set B: col[0] == val[1]
+    
+    print(f"  Set A: nested group with OR")
+    print(f"  Set B: simple filter")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Nested",
+                filters=[
+                    FilterGroup(
+                        filters=[
+                            FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0]),
+                            FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)
+                        ],
+                        logic="OR"
+                    )
+                ]
+            ),
+            FilterSet(
+                label="Simple",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]
+            )
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Nested: {response.sets['Nested'].count}, Simple: {response.sets['Simple'].count}")
+    assert response.sets["Nested"].count > 0, "Nested set should have rows"
+
+
+def test_analyze_overlap_with_negation(simple_fixture, file_loader):
+    """Test analyze_overlap with negated filters.
+    
+    Verifies:
+    - Negation works in overlap analysis
+    - NOT operator is applied correctly
+    """
+    print(f"\n🔍 Testing analyze_overlap: negated filters")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    value = ops.get_unique_values(unique_request).values[0]
+    
+    # Set A: NOT (col[0] == value)
+    # Set B: col[0] is_not_null
+    
+    print(f"  Set A: NOT ({simple_fixture.columns[0]} == '{value}')")
+    print(f"  Set B: {simple_fixture.columns[0]} is_not_null")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Negated",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value, negate=True)]
+            ),
+            FilterSet(
+                label="Non-null",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")]
+            )
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Negated: {response.sets['Negated'].count}, Non-null: {response.sets['Non-null'].count}")
+    
+    # Negated should exclude the value
+    assert response.sets["Negated"].count < simple_fixture.row_count, "Negated should exclude some rows"
+
+
+def test_analyze_overlap_empty_filter_set(simple_fixture, file_loader):
+    """Test analyze_overlap with empty filter (all rows).
+    
+    Verifies:
+    - Empty filter set returns all rows
+    - Overlap with empty set equals other set
+    """
+    print(f"\n🔍 Testing analyze_overlap: empty filter set")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    value = ops.get_unique_values(unique_request).values[0]
+    
+    # Set A: empty (all rows)
+    # Set B: specific value
+    
+    print(f"  Set A: empty (all rows)")
+    print(f"  Set B: {simple_fixture.columns[0]} == '{value}'")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="All", filters=[]),
+            FilterSet(label="Specific", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value)])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ All: {response.sets['All'].count}, Specific: {response.sets['Specific'].count}")
+    
+    # Empty filter should return all rows
+    assert response.sets["All"].count == simple_fixture.row_count, "Empty filter should return all rows"
+    
+    # Intersection should equal specific set (specific is subset of all)
+    assert response.pairwise_intersections["All ∩ Specific"] == response.sets["Specific"].count, "Intersection should equal specific count"
+
+
+# ============================================================================
+# ANALYZE_OVERLAP TESTS - EDGE CASES
+# ============================================================================
+
+def test_analyze_overlap_all_sets_empty(simple_fixture, file_loader):
+    """Test analyze_overlap when all sets are empty (no matching rows).
+    
+    Verifies:
+    - Handles all empty sets gracefully
+    - All counts are 0
+    """
+    print(f"\n🔍 Testing analyze_overlap: all sets empty")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Create sets that match nothing
+    impossible_value = "IMPOSSIBLE_VALUE_12345"
+    
+    print(f"  All sets filter for impossible value")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Empty A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=impossible_value)]),
+            FilterSet(label="Empty B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=impossible_value + "2")])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ All sets: 0 rows")
+    
+    assert response.sets["Empty A"].count == 0, "Set A should be empty"
+    assert response.sets["Empty B"].count == 0, "Set B should be empty"
+    assert response.pairwise_intersections["Empty A ∩ Empty B"] == 0, "Intersection should be 0"
+    assert response.union_count == 0, "Union should be 0"
+
+
+def test_analyze_overlap_one_set_empty_others_not(simple_fixture, file_loader):
+    """Test analyze_overlap when one set is empty, others are not.
+    
+    Verifies:
+    - Handles mixed empty/non-empty sets
+    - Empty set has 0 intersection with others
+    """
+    print(f"\n🔍 Testing analyze_overlap: one empty, others not")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    value = ops.get_unique_values(unique_request).values[0]
+    
+    # Set A: non-empty
+    # Set B: empty
+    
+    print(f"  Set A: non-empty, Set B: empty")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Non-empty", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=value)]),
+            FilterSet(label="Empty", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value="IMPOSSIBLE_12345")])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Non-empty: {response.sets['Non-empty'].count}, Empty: {response.sets['Empty'].count}")
+    
+    assert response.sets["Non-empty"].count > 0, "Non-empty set should have rows"
+    assert response.sets["Empty"].count == 0, "Empty set should have 0 rows"
+    assert response.pairwise_intersections["Non-empty ∩ Empty"] == 0, "Intersection with empty should be 0"
+    assert response.union_count == response.sets["Non-empty"].count, "Union should equal non-empty count"
+
+
+def test_analyze_overlap_union_equals_total_rows(simple_fixture, file_loader):
+    """Test analyze_overlap when union equals total rows (complete coverage).
+    
+    Verifies:
+    - Union can equal total row count
+    - Sets cover entire dataset
+    """
+    print(f"\n🔍 Testing analyze_overlap: union equals total rows")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Set A: col[1] > 0
+    # Set B: col[1] <= 0
+    # Should cover all rows (assuming no nulls)
+    
+    print(f"  Set A: {simple_fixture.columns[1]} > 0")
+    print(f"  Set B: {simple_fixture.columns[1]} <= 0")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Positive", filters=[FilterCondition(column=simple_fixture.columns[1], operator=">", value=0)]),
+            FilterSet(label="Non-positive", filters=[FilterCondition(column=simple_fixture.columns[1], operator="<=", value=0)])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Union: {response.union_count}, Total rows: {simple_fixture.row_count}")
+    
+    # Union should be close to total (may differ due to nulls)
+    assert response.union_count <= simple_fixture.row_count, "Union should not exceed total rows"
+
+
+# ============================================================================
+# ANALYZE_OVERLAP TESTS - VALIDATION
+# ============================================================================
+
+def test_analyze_overlap_invalid_filter_column(simple_fixture, file_loader):
+    """Test analyze_overlap with invalid column in filter.
+    
+    Verifies:
+    - Raises ValueError for non-existent column
+    - Error message is helpful
+    """
+    print(f"\n🔍 Testing analyze_overlap: invalid column")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        request = AnalyzeOverlapRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filter_sets=[
+                FilterSet(label="Invalid", filters=[FilterCondition(column="NonExistentColumn", operator="==", value="test")]),
+                FilterSet(label="Valid", filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")])
+            ]
+        )
+        ops.analyze_overlap(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    assert "not found" in str(exc_info.value).lower(), "Error should mention column not found"
+
+
+def test_analyze_overlap_less_than_two_sets(simple_fixture, file_loader):
+    """Test analyze_overlap with less than 2 sets (validation error).
+    
+    Verifies:
+    - Raises ValueError for < 2 sets
+    - Error message explains minimum requirement
+    """
+    print(f"\n🔍 Testing analyze_overlap: less than 2 sets")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        request = AnalyzeOverlapRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filter_sets=[
+                FilterSet(label="Only one", filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")])
+            ]
+        )
+        ops.analyze_overlap(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    assert "at least 2" in str(exc_info.value).lower() or "minimum" in str(exc_info.value).lower(), "Error should mention minimum 2 sets"
+
+
+def test_analyze_overlap_more_than_ten_sets(simple_fixture, file_loader):
+    """Test analyze_overlap with more than 10 sets (validation error).
+    
+    Verifies:
+    - Raises ValueError for > 10 sets
+    - Error message explains maximum limit
+    """
+    print(f"\n🔍 Testing analyze_overlap: more than 10 sets")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Create 11 filter sets
+    filter_sets = []
+    for i in range(11):
+        filter_sets.append(
+            FilterSet(label=f"Set {i+1}", filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")])
+        )
+    
+    # Act & Assert
+    with pytest.raises(ValueError) as exc_info:
+        request = AnalyzeOverlapRequest(
+            file_path=simple_fixture.path_str,
+            sheet_name=simple_fixture.sheet_name,
+            filter_sets=filter_sets
+        )
+        ops.analyze_overlap(request)
+    
+    print(f"✅ Caught expected error: {exc_info.value}")
+    assert "maximum" in str(exc_info.value).lower() or "10" in str(exc_info.value), "Error should mention maximum 10 sets"
+
+
+# ============================================================================
+# ANALYZE_OVERLAP TESTS - OUTPUT FORMATS
+# ============================================================================
+
+def test_analyze_overlap_tsv_output_two_sets(simple_fixture, file_loader):
+    """Test analyze_overlap TSV output format for 2 sets.
+    
+    Verifies:
+    - TSV contains Venn diagram data
+    - Format is correct for Excel paste
+    """
+    print(f"\n🔍 Testing analyze_overlap: TSV output for 2 sets")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    tsv = response.excel_output.tsv
+    print(f"✅ TSV output generated")
+    
+    assert tsv, "Should have TSV output"
+    assert "\t" in tsv, "TSV should use tab separator"
+    assert "\n" in tsv, "TSV should have line breaks"
+    assert "A" in tsv, "TSV should contain set labels"
+    assert "Union" in tsv, "TSV should contain union"
+
+
+def test_analyze_overlap_tsv_output_three_sets(simple_fixture, file_loader):
+    """Test analyze_overlap TSV output format for 3 sets.
+    
+    Verifies:
+    - TSV contains all 7 Venn zones
+    - Format shows zone labels and counts
+    """
+    print(f"\n🔍 Testing analyze_overlap: TSV output for 3 sets")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=3
+    )
+    values = ops.get_unique_values(unique_request).values[:3]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])]),
+            FilterSet(label="C", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[2])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    tsv = response.excel_output.tsv
+    print(f"✅ TSV output for 3 sets generated")
+    
+    assert "only" in tsv.lower(), "TSV should contain 'only' zones"
+    assert "∩" in tsv, "TSV should contain intersection symbol"
+
+
+def test_analyze_overlap_tsv_output_many_sets(simple_fixture, file_loader):
+    """Test analyze_overlap TSV output format for 4+ sets.
+    
+    Verifies:
+    - TSV contains pairwise intersections section
+    - General format for many sets
+    """
+    print(f"\n🔍 Testing analyze_overlap: TSV output for 4+ sets")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=4
+    )
+    values = ops.get_unique_values(unique_request).values[:4]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label=f"Set {i+1}", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[i])])
+            for i in range(4)
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    tsv = response.excel_output.tsv
+    print(f"✅ TSV output for 4+ sets generated")
+    
+    assert "Pairwise Intersections" in tsv, "TSV should have pairwise section"
+    assert "Union" in tsv, "TSV should contain union"
+
+
+def test_analyze_overlap_response_structure(simple_fixture, file_loader):
+    """Test analyze_overlap response structure is complete.
+    
+    Verifies:
+    - All required fields are present
+    - Types are correct
+    - No missing data
+    """
+    print(f"\n🔍 Testing analyze_overlap: response structure")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Checking response structure")
+    
+    # Required fields
+    assert hasattr(response, "sets"), "Should have 'sets' field"
+    assert hasattr(response, "pairwise_intersections"), "Should have 'pairwise_intersections' field"
+    assert hasattr(response, "union_count"), "Should have 'union_count' field"
+    assert hasattr(response, "union_percentage"), "Should have 'union_percentage' field"
+    assert hasattr(response, "venn_diagram_2"), "Should have 'venn_diagram_2' field"
+    assert hasattr(response, "venn_diagram_3"), "Should have 'venn_diagram_3' field"
+    assert hasattr(response, "excel_output"), "Should have 'excel_output' field"
+    assert hasattr(response, "metadata"), "Should have 'metadata' field"
+    assert hasattr(response, "performance"), "Should have 'performance' field"
+    
+    # Types
+    assert isinstance(response.sets, dict), "sets should be dict"
+    assert isinstance(response.pairwise_intersections, dict), "pairwise_intersections should be dict"
+    assert isinstance(response.union_count, int), "union_count should be int"
+    assert isinstance(response.union_percentage, (int, float)), "union_percentage should be numeric"
+
+
+# ============================================================================
+# ANALYZE_OVERLAP TESTS - PERFORMANCE AND METADATA
+# ============================================================================
+
+def test_analyze_overlap_performance_metrics(simple_fixture, file_loader):
+    """Test analyze_overlap includes performance metrics.
+    
+    Verifies:
+    - Performance metrics are present
+    - Execution time is reasonable
+    - Cache status is reported
+    """
+    print(f"\n🔍 Testing analyze_overlap: performance metrics")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Performance:")
+    print(f"   Execution time: {response.performance.execution_time_ms}ms")
+    print(f"   Cache hit: {response.performance.cache_hit}")
+    
+    assert response.performance is not None, "Should have performance metrics"
+    assert response.performance.execution_time_ms > 0, "Should have execution time"
+    assert response.performance.cache_hit in [True, False], "Should report cache status"
+    assert response.performance.execution_time_ms < 5000, "Should complete in reasonable time"
+
+
+def test_analyze_overlap_metadata_correct(simple_fixture, file_loader):
+    """Test analyze_overlap includes correct metadata.
+    
+    Verifies:
+    - Metadata is present
+    - File format and sheet name are correct
+    - Row/column totals are reported
+    """
+    print(f"\n🔍 Testing analyze_overlap: metadata")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Metadata:")
+    print(f"   File format: {response.metadata.file_format}")
+    print(f"   Sheet: {response.metadata.sheet_name}")
+    print(f"   Rows: {response.metadata.rows_total}")
+    
+    assert response.metadata is not None, "Should have metadata"
+    assert response.metadata.file_format == simple_fixture.format, "Should report correct format"
+    assert response.metadata.sheet_name == simple_fixture.sheet_name, "Should report correct sheet"
+    assert response.metadata.rows_total == simple_fixture.row_count, "Should report total rows"
+
+
+def test_analyze_overlap_percentages_calculation(simple_fixture, file_loader):
+    """Test analyze_overlap calculates percentages correctly.
+    
+    Verifies:
+    - Set percentages are calculated
+    - Union percentage is calculated
+    - Percentages are in valid range (0-100)
+    """
+    print(f"\n🔍 Testing analyze_overlap: percentage calculation")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet, GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="A", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])]),
+            FilterSet(label="B", filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Percentages:")
+    print(f"   Set A: {response.sets['A'].percentage}%")
+    print(f"   Set B: {response.sets['B'].percentage}%")
+    print(f"   Union: {response.union_percentage}%")
+    
+    # Check percentages are in valid range
+    assert 0 <= response.sets["A"].percentage <= 100, "Set A percentage should be 0-100"
+    assert 0 <= response.sets["B"].percentage <= 100, "Set B percentage should be 0-100"
+    assert 0 <= response.union_percentage <= 100, "Union percentage should be 0-100"
+    
+    # Verify calculation
+    expected_percentage = (response.union_count / simple_fixture.row_count * 100) if simple_fixture.row_count > 0 else 0
+    assert abs(response.union_percentage - expected_percentage) < 0.1, "Union percentage should be correct"
+
+
+def test_analyze_overlap_unicode_column_names(mixed_languages_fixture, file_loader):
+    """Test analyze_overlap with Unicode column names.
+    
+    Verifies:
+    - Handles Unicode column names correctly
+    - TSV output preserves Unicode
+    - Labels with Unicode work correctly
+    """
+    print(f"\n🔍 Testing analyze_overlap: Unicode column names")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Use Unicode column
+    unicode_column = mixed_languages_fixture.columns[0]
+    
+    print(f"  Using Unicode column: {unicode_column}")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=mixed_languages_fixture.path_str,
+        sheet_name=mixed_languages_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Набор А", filters=[FilterCondition(column=unicode_column, operator="is_not_null")]),
+            FilterSet(label="Набор Б", filters=[FilterCondition(column=unicode_column, operator="is_not_null")])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Unicode labels: {list(response.sets.keys())}")
+    
+    assert "Набор А" in response.sets, "Should handle Unicode labels"
+    assert "Набор Б" in response.sets, "Should handle Unicode labels"
+    
+    # TSV should preserve Unicode
+    tsv = response.excel_output.tsv
+    assert "Набор А" in tsv, "TSV should preserve Unicode"
+
+
+@pytest.mark.slow
+def test_analyze_overlap_performance_large_file(large_10k_fixture, file_loader):
+    """Test analyze_overlap performance on large file (10k rows).
+    
+    Verifies:
+    - Handles large files efficiently
+    - Performance is acceptable
+    - Memory usage is reasonable
+    """
+    print(f"\n🔍 Testing analyze_overlap: performance on 10k rows")
+    
+    from mcp_excel.models.requests import AnalyzeOverlapRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Create 3 sets with different filters
+    print(f"  Testing with 3 sets on {large_10k_fixture.row_count} rows")
+    
+    # Act
+    request = AnalyzeOverlapRequest(
+        file_path=large_10k_fixture.path_str,
+        sheet_name=large_10k_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(label="Low", filters=[FilterCondition(column="Total", operator="<", value=500)]),
+            FilterSet(label="Medium", filters=[FilterCondition(column="Total", operator=">=", value=500), FilterCondition(column="Total", operator="<", value=1000)], logic="AND"),
+            FilterSet(label="High", filters=[FilterCondition(column="Total", operator=">=", value=1000)])
+        ]
+    )
+    response = ops.analyze_overlap(request)
+    
+    # Assert
+    print(f"✅ Performance on large file:")
+    print(f"   Execution time: {response.performance.execution_time_ms}ms")
+    print(f"   Memory used: {response.performance.memory_used_mb}MB")
+    
+    assert response.performance.execution_time_ms < 3000, "Should complete in reasonable time for 10k rows"
+    assert len(response.sets) == 3, "Should process all 3 sets"
+    assert response.union_count <= large_10k_fixture.row_count, "Union should not exceed total rows"
