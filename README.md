@@ -15,13 +15,13 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
 *Works with OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
 
-[Why This Exists](#why-this-exists) • [What Your Agent Can Do](#what-your-agent-can-do) • [Installation & Configuration](#installation--configuration) • [Available Tools](#available-tools) • [💖 Sponsor](#-support-the-project)
+[Why This Exists](#-why-this-exists) • [What Your Agent Can Do](#-what-your-agent-can-do) • [Installation & Configuration](#%EF%B8%8F-installation--configuration) • [Available Tools](#%EF%B8%8F-available-tools) • [💖 Donate](#-support-the-project)
 
 </div>
 
 ---
 
-## Why This Exists
+## 🤨 Why This Exists
 
 **The Problem:** Most Excel tools for AI dump raw spreadsheet data into the agent's context. This floods the context window, slows everything down, and the AI can still miscalculate or get confused in large datasets.
 
@@ -32,7 +32,7 @@ The agent analyzes data **without seeing it**. Results come as numbers, formulas
 > *"This is like working with a database through SQL, not dragging everything into memory."*
 > — AI Agent after analyzing a production spreadsheet
 
-### What is MCP?
+### 🔌 What is MCP?
 
 [Model Context Protocol](https://modelcontextprotocol.io) is an open standard that lets AI agents use external tools.
 
@@ -42,7 +42,7 @@ This server is such a tool. When you connect it to your AI agent (Claude Desktop
 
 ---
 
-## What AI Agents Say About It
+## 💬 What AI Agents Say About It
 
 Real feedback from AI agents that used this MCP server in production:
 
@@ -58,7 +58,7 @@ Real feedback from AI agents that used this MCP server in production:
 
 ---
 
-## What Your Agent Can Do
+## 🚀 What Your Agent Can Do
 
 Once connected, your AI agent gets a lot of specialized tools for analyzing spreadsheet data. The agent receives only precise queries and reliable results.
 
@@ -104,12 +104,11 @@ Once connected, your AI agent gets a lot of specialized tools for analyzing spre
 - *"Which customers are both VIP and active? (overlap analysis)"*
 - *"Find duplicates in the email column"*
 
-## Prerequisites
+## ⚙️ Installation & Configuration
 
-- Python 3.10 or higher
-- Poetry (recommended) or pip
+### Prerequisites
 
-## Installation & Configuration
+**Python 3.10 or higher** — [Download here](https://www.python.org/downloads/)
 
 ### Step 1: Clone Repository
 
@@ -123,7 +122,7 @@ cd mcp-excel
 ### Step 2: Choose Installation Method
 
 <details>
-<summary><b>Option A: Poetry (Recommended)</b></summary>
+<summary><b>🎯 Option A: Poetry (Recommended)</b></summary>
 
 *Poetry is a modern Python dependency manager (replaces pip+venv+requirements.txt). [Install it](https://python-poetry.org/docs/#installation): `pip install poetry` or `pipx install poetry`*
 
@@ -152,7 +151,7 @@ Add this to your MCP settings (JSON config):
 </details>
 
 <details>
-<summary><b>Option B: pip with virtual environment</b></summary>
+<summary><b>📦 Option B: pip with virtual environment</b></summary>
 
 **Install dependencies:**
 ```bash
@@ -198,7 +197,7 @@ Add this to your MCP settings (JSON config):
 </details>
 
 <details>
-<summary><b>Option C: System Python (Not Recommended)</b></summary>
+<summary><b>⚠️ Option C: System Python (Not Recommended)</b></summary>
 
 **Install dependencies globally:**
 ```bash
@@ -240,7 +239,7 @@ Works with any MCP-compatible AI agent.
 
 ⚠️ **Important:** This is an MCP server. It runs automatically when your AI agent needs it. Do not run it manually in terminal.
 
-## Usage
+## 💡 Usage
 
 After configuration, restart your AI agent and ask it to analyze Excel files:
 
@@ -251,7 +250,7 @@ After configuration, restart your AI agent and ask it to analyze Excel files:
 "Calculate month-over-month growth from revenue.xls"
 ```
 
-## Available Tools
+## 🛠️ Available Tools
 
 <details>
 <summary><b>📋 Complete Tool Reference (25 tools) - Click to expand</b></summary>
@@ -440,7 +439,7 @@ Arithmetic expressions between columns.
 
 </details>
 
-## Roadmap
+## 🗺️ Roadmap
 
 ### 📁 File Format Support
 
@@ -464,7 +463,7 @@ Arithmetic expressions between columns.
 
 ---
 
-## License
+## 📜 License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
@@ -515,7 +514,7 @@ Every contribution helps keep this project alive and growing
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please ensure:
 
@@ -525,6 +524,16 @@ Contributions are welcome! Please ensure:
 4. Documentation is updated
 
 For issues, questions, or contributions, please open an issue on GitHub.
+
+---
+
+## 💬 Need Help?
+
+Got questions? Found a bug? Have a feature idea? We're here to help!
+
+**👉 [Open an Issue on GitHub](https://github.com/jwadow/mcp-excel/issues/new)**
+
+Whether you're stuck with installation, found something broken, or just want to suggest an improvement — GitHub Issues is the place. Don't worry if you're new to GitHub, just click the link above and describe your situation. We'll figure it out together.
 
 ---
 
