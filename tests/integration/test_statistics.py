@@ -1403,3 +1403,74 @@ def test_get_column_stats_nested_with_negation(numeric_types_fixture, file_loade
     print(f"   Count: {response.stats.count}")
     
     assert response.stats.count > 0, "Should have rows not matching the group"
+
+
+# ============================================================================
+# SAMPLE_ROWS PARAMETER TESTS
+# ============================================================================
+
+def test_get_column_stats_with_sample_rows(numeric_types_fixture, file_loader):
+    """Test get_column_stats with sample_rows parameter.
+    
+    Verifies:
+    - sample_rows parameter returns sample data
+    - Sample data shows rows used in statistics
+    - Values are formatted correctly
+    """
+    print(f"\n🔍 Testing get_column_stats with sample_rows")
+    
+    ops = StatisticsOperations(file_loader)
+    
+    # Act
+    request = GetColumnStatsRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        column="Количество",
+        filters=[
+            FilterCondition(column="Цена", operator=">", value=100)
+        ],
+        sample_rows=4
+    )
+    response = ops.get_column_stats(request)
+    
+    # Assert
+    print(f"✅ Stats count: {response.stats.count}, Sample rows: {len(response.sample_rows) if response.sample_rows else 0}")
+    
+    assert response.sample_rows is not None, "Should return sample_rows"
+    assert isinstance(response.sample_rows, list), "sample_rows should be list"
+    assert len(response.sample_rows) <= 4, "Should return at most 4 rows"
+    assert len(response.sample_rows) <= response.stats.count, "Sample size should not exceed stats count"
+    
+    # Verify structure
+    if response.sample_rows:
+        assert all(isinstance(row, dict) for row in response.sample_rows), "Each row should be dict"
+        assert all("Количество" in row for row in response.sample_rows), "Should have analyzed column"
+        assert all("Цена" in row for row in response.sample_rows), "Should have filter column"
+        # Verify filter was applied: all Цена > 100
+        assert all(row["Цена"] > 100 for row in response.sample_rows), "All samples should match filter"
+
+
+def test_get_column_stats_sample_rows_none(simple_fixture, file_loader):
+    """Test get_column_stats with sample_rows=None (default).
+    
+    Verifies:
+    - sample_rows=None returns None (backward compatibility)
+    - No sample data in response
+    """
+    print(f"\n🔍 Testing get_column_stats with sample_rows=None")
+    
+    ops = StatisticsOperations(file_loader)
+    
+    # Act
+    request = GetColumnStatsRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[1],
+        sample_rows=None
+    )
+    response = ops.get_column_stats(request)
+    
+    # Assert
+    print(f"✅ Stats count: {response.stats.count}, Sample rows: {response.sample_rows}")
+    
+    assert response.sample_rows is None, "Should return None when sample_rows=None"

@@ -595,3 +595,105 @@ def test_filter_and_count_batch_max_filter_sets(mcp_call_tool, simple_fixture):
     assert result["total_filter_sets"] == 10
     
     print(f"  ✅ Processed {result['total_filter_sets']} filter sets successfully")
+
+
+# ============================================================================
+# SAMPLE_ROWS PARAMETER TESTS
+# ============================================================================
+
+def test_filter_and_count_with_sample_rows(mcp_call_tool, simple_fixture):
+    """Smoke: filter_and_count with sample_rows parameter.
+    
+    Verifies:
+    - sample_rows parameter works
+    - Returns sample data in response
+    """
+    print(f"\n🔢 Testing filter_and_count with sample_rows...")
+    
+    column = simple_fixture.columns[0]
+    unique_result = mcp_call_tool("get_unique_values", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "column": column,
+        "limit": 1
+    })
+    
+    if unique_result["count"] == 0:
+        print(f"  ⚠️  No unique values, skipping")
+        return
+    
+    filter_value = unique_result["values"][0]
+    
+    result = mcp_call_tool("filter_and_count", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "filters": [
+            {"column": column, "operator": "==", "value": filter_value}
+        ],
+        "sample_rows": 3
+    })
+    
+    # Verify sample_rows in response
+    assert "sample_rows" in result, "Response should have sample_rows field"
+    
+    if result["sample_rows"] is not None:
+        assert isinstance(result["sample_rows"], list), "sample_rows should be list"
+        assert len(result["sample_rows"]) <= 3, "Should return at most 3 rows"
+        print(f"  ✅ Count: {result['count']}, Sample rows: {len(result['sample_rows'])}")
+    else:
+        print(f"  ✅ Count: {result['count']}, No sample rows (None)")
+
+
+def test_filter_and_count_batch_with_sample_rows(mcp_call_tool, simple_fixture):
+    """Smoke: filter_and_count_batch with sample_rows in filter sets.
+    
+    Verifies:
+    - sample_rows works in batch mode
+    - Each filter set can have different sample_rows
+    """
+    print(f"\n📊 Testing filter_and_count_batch with sample_rows...")
+    
+    column = simple_fixture.columns[0]
+    unique_result = mcp_call_tool("get_unique_values", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "column": column,
+        "limit": 2
+    })
+    
+    if unique_result["count"] < 2:
+        print(f"  ⚠️  Need at least 2 unique values, skipping")
+        return
+    
+    val1 = unique_result["values"][0]
+    val2 = unique_result["values"][1]
+    
+    result = mcp_call_tool("filter_and_count_batch", {
+        "file_path": str(simple_fixture.path_str),
+        "sheet_name": simple_fixture.sheet_name,
+        "filter_sets": [
+            {
+                "label": "Set 1 with samples",
+                "filters": [{"column": column, "operator": "==", "value": val1}],
+                "sample_rows": 2
+            },
+            {
+                "label": "Set 2 no samples",
+                "filters": [{"column": column, "operator": "==", "value": val2}]
+            }
+        ]
+    })
+    
+    assert len(result["results"]) == 2, "Should have 2 results"
+    
+    # Verify sample_rows in each result
+    for i, filter_result in enumerate(result["results"]):
+        assert "sample_rows" in filter_result, f"Result {i} should have sample_rows field"
+        
+        if filter_result["sample_rows"] is not None:
+            sample_count = len(filter_result["sample_rows"])
+            print(f"  {filter_result['label']}: {filter_result['count']} rows, {sample_count} samples")
+        else:
+            print(f"  {filter_result['label']}: {filter_result['count']} rows, no samples")
+    
+    print(f"  ✅ Batch with sample_rows works!")

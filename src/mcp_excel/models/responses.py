@@ -116,6 +116,7 @@ class FilterAndCountResponse(BaseModel):
     count: int = Field(description="Number of rows matching filters")
     filters_applied: list[dict[str, Any]] = Field(description="Filters that were applied")
     excel_output: ExcelOutput = Field(description="Excel-formatted output with formula")
+    sample_rows: Optional[list[dict[str, Any]]] = Field(default=None, description="Sample rows matching filters")
     metadata: FileMetadata = Field(description="File metadata")
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
@@ -140,6 +141,7 @@ class AggregateResponse(BaseModel):
     target_column: str = Field(description="Column that was aggregated")
     filters_applied: list[dict[str, Any]] = Field(description="Filters that were applied")
     excel_output: ExcelOutput = Field(description="Excel-formatted output with formula")
+    sample_rows: Optional[list[dict[str, Any]]] = Field(default=None, description="Sample rows used in aggregation")
     metadata: FileMetadata = Field(description="File metadata")
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
@@ -187,6 +189,7 @@ class GetColumnStatsResponse(BaseModel):
     column: str = Field(description="Column name")
     stats: ColumnStats = Field(description="Statistical summary")
     excel_output: ExcelOutput = Field(description="Excel-formatted output")
+    sample_rows: Optional[list[dict[str, Any]]] = Field(default=None, description="Sample rows from analyzed data")
     metadata: FileMetadata = Field(description="File metadata")
     performance: PerformanceMetrics = Field(description="Performance metrics")
 
@@ -338,6 +341,7 @@ class FilterSetResult(BaseModel):
     count: int = Field(description="Number of rows matching this filter set")
     filters_applied: list[dict[str, Any]] = Field(description="Filters that were applied in this set")
     formula: Optional[str] = Field(default=None, description="Excel formula for this filter set")
+    sample_rows: Optional[list[dict[str, Any]]] = Field(default=None, description="Sample rows for this filter set")
 
 
 class FilterAndCountBatchResponse(BaseModel):

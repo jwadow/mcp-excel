@@ -66,6 +66,9 @@ class StatisticsOperations(BaseOperations):
         if request.filters:
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
+        # Store filtered df for sample_rows
+        filtered_df_for_samples = df.copy()
+
         # Get column data
         col_data = df[actual_column]
 
@@ -115,10 +118,13 @@ class StatisticsOperations(BaseOperations):
 
         performance = self._get_performance_metrics(start_time, len(df), False)
 
+        sample_rows_data = self._add_sample_rows(filtered_df_for_samples, request.sample_rows)
+
         return GetColumnStatsResponse(
             column=request.column,
             stats=stats,
             excel_output=excel_output,
+            sample_rows=sample_rows_data,
             metadata=metadata,
             performance=performance,
         )

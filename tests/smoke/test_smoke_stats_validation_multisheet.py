@@ -451,3 +451,36 @@ def test_compare_sheets_basic(mcp_call_tool, multi_sheet_fixture):
     assert result["compare_columns"] == [compare_column]
     
     print(f"  ✅ Found {result['difference_count']} differences between '{sheet1}' and '{sheet2}'")
+
+
+# ============================================================================
+# SAMPLE_ROWS PARAMETER TESTS
+# ============================================================================
+
+def test_get_column_stats_with_sample_rows(mcp_call_tool, numeric_types_fixture):
+    """Smoke: get_column_stats with sample_rows parameter.
+    
+    Verifies:
+    - sample_rows parameter works in get_column_stats
+    - Returns sample data showing rows analyzed
+    """
+    print(f"\n📊 Testing get_column_stats with sample_rows...")
+    
+    column = numeric_types_fixture.columns[0]
+    
+    result = mcp_call_tool("get_column_stats", {
+        "file_path": str(numeric_types_fixture.path_str),
+        "sheet_name": numeric_types_fixture.sheet_name,
+        "column": column,
+        "sample_rows": 5
+    })
+    
+    # Verify sample_rows in response
+    assert "sample_rows" in result, "Response should have sample_rows field"
+    
+    if result["sample_rows"] is not None:
+        assert isinstance(result["sample_rows"], list), "sample_rows should be list"
+        assert len(result["sample_rows"]) <= 5, "Should return at most 5 rows"
+        print(f"  ✅ Stats count: {result['stats']['count']}, Sample rows: {len(result['sample_rows'])}")
+    else:
+        print(f"  ✅ Stats count: {result['stats']['count']}, No sample rows")

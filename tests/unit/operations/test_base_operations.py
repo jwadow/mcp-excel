@@ -998,3 +998,137 @@ def test_find_column_case_sensitive(file_loader):
     
     assert actual_upper == "Name", "Should find uppercase version"
     assert actual_lower == "name", "Should find lowercase version"
+
+
+# ============================================================================
+# _ADD_SAMPLE_ROWS TESTS
+# ============================================================================
+
+def test_add_sample_rows_with_none(file_loader):
+    """Test _add_sample_rows returns None when sample_size is None.
+    
+    Verifies:
+    - Returns None when sample_size=None (default behavior)
+    - No data processing occurs
+    """
+    print("\n🔍 Testing _add_sample_rows with None")
+    
+    ops = BaseOperations(file_loader)
+    df = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]})
+    
+    result = ops._add_sample_rows(df, sample_size=None)
+    
+    print(f"  Result: {result}")
+    
+    assert result is None, "Should return None when sample_size is None"
+
+
+def test_add_sample_rows_with_count(file_loader):
+    """Test _add_sample_rows returns N rows when sample_size=N.
+    
+    Verifies:
+    - Returns exactly N rows when N < len(df)
+    - Rows are formatted as list of dicts
+    - Values are formatted (integers without .0)
+    """
+    print("\n🔍 Testing _add_sample_rows with count")
+    
+    ops = BaseOperations(file_loader)
+    df = pd.DataFrame({
+        "Name": ["Alice", "Bob", "Charlie"],
+        "Age": [25, 30, 35],
+        "Score": [95.5, 88.0, 92.3]
+    })
+    
+    result = ops._add_sample_rows(df, sample_size=2)
+    
+    print(f"  Result: {result}")
+    
+    assert result is not None, "Should return list"
+    assert isinstance(result, list), "Should be list"
+    assert len(result) == 2, "Should return exactly 2 rows"
+    
+    # Verify structure
+    assert all(isinstance(row, dict) for row in result), "Each row should be dict"
+    assert all("Name" in row and "Age" in row and "Score" in row for row in result), "All columns present"
+    
+    # Verify formatting: 88.0 should become 88 (int)
+    assert result[1]["Age"] == 30, "Age should be int"
+    assert isinstance(result[1]["Age"], int), "Age should be int type"
+    assert result[1]["Score"] == 88, "Score 88.0 should be formatted as 88"
+    assert isinstance(result[1]["Score"], int), "Score 88.0 should be int type"
+
+
+def test_add_sample_rows_exceeds_size(file_loader):
+    """Test _add_sample_rows when requested size exceeds DataFrame size.
+    
+    Verifies:
+    - Returns all rows when sample_size > len(df)
+    - No error raised
+    - Returns min(sample_size, len(df)) rows
+    """
+    print("\n🔍 Testing _add_sample_rows exceeds size")
+    
+    ops = BaseOperations(file_loader)
+    df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+    
+    result = ops._add_sample_rows(df, sample_size=10)
+    
+    print(f"  Requested: 10, Available: 2, Got: {len(result)}")
+    
+    assert result is not None, "Should return list"
+    assert len(result) == 2, "Should return all 2 rows (not 10)"
+
+
+def test_add_sample_rows_empty_dataframe(file_loader):
+    """Test _add_sample_rows with empty DataFrame.
+    
+    Verifies:
+    - Returns empty list for empty DataFrame
+    - No error raised
+    """
+    print("\n🔍 Testing _add_sample_rows with empty DataFrame")
+    
+    ops = BaseOperations(file_loader)
+    df = pd.DataFrame({"A": [], "B": []})
+    
+    result = ops._add_sample_rows(df, sample_size=5)
+    
+    print(f"  Result: {result}")
+    
+    assert result is not None, "Should return list"
+    assert isinstance(result, list), "Should be list"
+    assert len(result) == 0, "Should return empty list"
+
+
+def test_add_sample_rows_formats_integers(file_loader):
+    """Test _add_sample_rows formats float integers correctly.
+    
+    Verifies:
+    - Float values like 50089416.0 are formatted as int 50089416
+    - Uses _format_value() internally
+    - No .0 suffix in output
+    """
+    print("\n🔍 Testing _add_sample_rows formats integers")
+    
+    ops = BaseOperations(file_loader)
+    df = pd.DataFrame({
+        "ID": [50089416.0, 50089417.0],
+        "Value": [100.5, 200.0]
+    })
+    
+    result = ops._add_sample_rows(df, sample_size=2)
+    
+    print(f"  Result: {result}")
+    
+    # Verify ID is formatted as int (no .0)
+    assert result[0]["ID"] == 50089416, "ID should be int"
+    assert isinstance(result[0]["ID"], int), "ID should be int type"
+    
+    # Verify Value with .0 is also formatted as int
+    assert result[1]["Value"] == 200, "Value 200.0 should be int"
+    assert isinstance(result[1]["Value"], int), "Value 200.0 should be int type"
+    
+    # Verify Value with decimal stays float
+    assert result[0]["Value"] == 100.5, "Value 100.5 should stay float"
+    assert isinstance(result[0]["Value"], float), "Value 100.5 should be float type"

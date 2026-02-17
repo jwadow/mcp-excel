@@ -412,6 +412,10 @@ class MCPExcelServer:
                                 "type": "integer",
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
+                            "sample_rows": {
+                                "type": "integer",
+                                "description": "Number of sample rows to return (optional). Shows examples of rows matching filters.",
+                            },
                         },
                         "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "filters"],
@@ -449,6 +453,10 @@ class MCPExcelServer:
                                             "enum": ["AND", "OR"],
                                             "description": LOGIC_DESCRIPTION,
                                             "default": "AND"
+                                        },
+                                        "sample_rows": {
+                                            "type": "integer",
+                                            "description": "Number of sample rows to return for this filter set (optional).",
                                         }
                                     },
                                     "required": ["filters"]
@@ -542,6 +550,10 @@ class MCPExcelServer:
                                 "type": "integer",
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
                             },
+                            "sample_rows": {
+                                "type": "integer",
+                                "description": "Number of sample rows to return (optional). Shows examples of rows used in aggregation.",
+                            },
                         },
                         "definitions": FILTER_DEFINITIONS,
                         "required": ["file_path", "sheet_name", "operation", "target_column"],
@@ -619,6 +631,10 @@ class MCPExcelServer:
                             "header_row": {
                                 "type": "integer",
                                 "description": "Row index for headers (optional, auto-detected if not provided)",
+                            },
+                            "sample_rows": {
+                                "type": "integer",
+                                "description": "Number of sample rows to return (optional). Shows examples of data being analyzed.",
                             },
                         },
                         "definitions": FILTER_DEFINITIONS,

@@ -480,3 +480,37 @@ def test_group_by_tsv_output(mcp_call_tool, simple_fixture):
     assert len(data_lines) == len(result["groups"]), f"TSV should have {len(result['groups'])} data rows"
     
     print(f"  ✅ TSV format valid: {len(lines)} lines (1 header + {len(data_lines)} data rows)")
+
+
+# ============================================================================
+# SAMPLE_ROWS PARAMETER TESTS
+# ============================================================================
+
+def test_aggregate_with_sample_rows(mcp_call_tool, numeric_types_fixture):
+    """Smoke: aggregate with sample_rows parameter.
+    
+    Verifies:
+    - sample_rows parameter works in aggregate
+    - Returns sample data showing rows used in aggregation
+    """
+    print(f"\n📊 Testing aggregate with sample_rows...")
+    
+    column = numeric_types_fixture.columns[0]
+    
+    result = mcp_call_tool("aggregate", {
+        "file_path": str(numeric_types_fixture.path_str),
+        "sheet_name": numeric_types_fixture.sheet_name,
+        "operation": "sum",
+        "target_column": column,
+        "sample_rows": 4
+    })
+    
+    # Verify sample_rows in response
+    assert "sample_rows" in result, "Response should have sample_rows field"
+    
+    if result["sample_rows"] is not None:
+        assert isinstance(result["sample_rows"], list), "sample_rows should be list"
+        assert len(result["sample_rows"]) <= 4, "Should return at most 4 rows"
+        print(f"  ✅ Sum: {result['value']}, Sample rows: {len(result['sample_rows'])}")
+    else:
+        print(f"  ✅ Sum: {result['value']}, No sample rows")

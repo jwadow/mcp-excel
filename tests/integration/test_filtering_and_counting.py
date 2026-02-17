@@ -2176,3 +2176,123 @@ def test_filter_and_count_batch_mixed_flat_and_nested(simple_fixture, file_loade
     assert response.results[0].formula is not None, "Flat filter should have formula"
     # Nested filter should not have formula
     assert response.results[1].formula is None, "Nested filter should not have formula"
+
+
+# ============================================================================
+# SAMPLE_ROWS PARAMETER TESTS
+# ============================================================================
+
+def test_filter_and_count_with_sample_rows(simple_fixture, file_loader):
+    """Test filter_and_count with sample_rows parameter.
+    
+    Verifies:
+    - sample_rows parameter returns sample data
+    - Sample data is list of dicts
+    - Sample size matches request
+    - Values are formatted correctly
+    """
+    print(f"\n🔍 Testing filter_and_count with sample_rows")
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test value
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=1
+    )
+    test_value = ops.get_unique_values(unique_request).values[0]
+    
+    # Act
+    request = FilterAndCountRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filters=[
+            FilterCondition(column=simple_fixture.columns[0], operator="==", value=test_value)
+        ],
+        sample_rows=3
+    )
+    response = ops.filter_and_count(request)
+    
+    # Assert
+    print(f"✅ Count: {response.count}, Sample rows: {len(response.sample_rows) if response.sample_rows else 0}")
+    
+    assert response.sample_rows is not None, "Should return sample_rows"
+    assert isinstance(response.sample_rows, list), "sample_rows should be list"
+    assert len(response.sample_rows) <= 3, "Should return at most 3 rows"
+    assert len(response.sample_rows) <= response.count, "Sample size should not exceed count"
+    
+    # Verify structure
+    if response.sample_rows:
+        assert all(isinstance(row, dict) for row in response.sample_rows), "Each row should be dict"
+        assert all(simple_fixture.columns[0] in row for row in response.sample_rows), "Should have filtered column"
+
+
+def test_filter_and_count_batch_with_sample_rows(simple_fixture, file_loader):
+    """Test filter_and_count_batch with sample_rows in FilterSet.
+    
+    Verifies:
+    - Each FilterSet can have its own sample_rows
+    - Sample data returned per filter set
+    - Different sample sizes work independently
+    """
+    print(f"\n🔍 Testing filter_and_count_batch with sample_rows")
+    
+    from mcp_excel.models.requests import GetUniqueValuesRequest, FilterAndCountBatchRequest, FilterSet
+    
+    ops = DataOperations(file_loader)
+    
+    # Get test values
+    unique_request = GetUniqueValuesRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        column=simple_fixture.columns[0],
+        limit=2
+    )
+    values = ops.get_unique_values(unique_request).values[:2]
+    
+    # Act
+    request = FilterAndCountBatchRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        filter_sets=[
+            FilterSet(
+                label="Set 1",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[0])],
+                sample_rows=2
+            ),
+            FilterSet(
+                label="Set 2",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="==", value=values[1])],
+                sample_rows=5
+            ),
+            FilterSet(
+                label="Set 3 (no samples)",
+                filters=[FilterCondition(column=simple_fixture.columns[0], operator="is_not_null")],
+                sample_rows=None
+            )
+        ]
+    )
+    response = ops.filter_and_count_batch(request)
+    
+    # Assert
+    print(f"✅ Results:")
+    for result in response.results:
+        sample_count = len(result.sample_rows) if result.sample_rows else 0
+        print(f"   {result.label}: {result.count} rows, {sample_count} samples")
+    
+    assert len(response.results) == 3, "Should have 3 results"
+    
+    # Set 1: should have sample_rows (max 2)
+    assert response.results[0].sample_rows is not None, "Set 1 should have samples"
+    assert len(response.results[0].sample_rows) <= 2, "Set 1 should have at most 2 samples"
+    
+    # Set 2: should have sample_rows (max 5)
+    assert response.results[1].sample_rows is not None, "Set 2 should have samples"
+    assert len(response.results[1].sample_rows) <= 5, "Set 2 should have at most 5 samples"
+    
+    # Set 3: should NOT have sample_rows (None)
+    assert response.results[2].sample_rows is None, "Set 3 should not have samples"

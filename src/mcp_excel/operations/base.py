@@ -375,6 +375,38 @@ class BaseOperations:
             return MAX_ROW_LIMIT
         return limit
 
+    def _add_sample_rows(
+        self,
+        df: pd.DataFrame,
+        sample_size: int | None
+    ) -> list[dict[str, Any]] | None:
+        """Add sample rows to response.
+        
+        Args:
+            df: DataFrame to sample from
+            sample_size: Number of rows to return (None = don't return)
+            
+        Returns:
+            List of row dictionaries or None
+            
+        Note:
+            No artificial limit on sample_size. If response becomes too large,
+            existing _validate_response_size() will catch it and provide
+            actionable error message to agent.
+        """
+        if sample_size is None:
+            return None
+        
+        # Return requested number of rows (or all if less available)
+        actual_size = min(sample_size, len(df))
+        
+        # Format values (int instead of float for integers)
+        rows = df.head(actual_size).to_dict('records')
+        return [
+            {k: self._format_value(v) for k, v in row.items()}
+            for row in rows
+        ]
+
     def _ensure_numeric_column(
         self,
         col_data: pd.Series,

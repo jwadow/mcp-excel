@@ -97,6 +97,7 @@ class FilterAndCountRequest(BaseModel):
     filters: list[Union[FilterCondition, FilterGroup]] = Field(description="List of filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for combining filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+    sample_rows: Optional[int] = Field(default=None, description="Number of sample rows to return (None = don't return)")
 
 
 class FilterAndGetRowsRequest(BaseModel):
@@ -124,6 +125,7 @@ class AggregateRequest(BaseModel):
     filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+    sample_rows: Optional[int] = Field(default=None, description="Number of sample rows to return (None = don't return)")
 
 
 class GroupByRequest(BaseModel):
@@ -162,6 +164,7 @@ class GetColumnStatsRequest(BaseModel):
     filters: list[Union[FilterCondition, FilterGroup]] = Field(default_factory=list, description="Optional filter conditions or nested groups")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for filters")
     header_row: Optional[int] = Field(default=None, description="Row index for headers (None = auto-detect)")
+    sample_rows: Optional[int] = Field(default=None, description="Number of sample rows to return (None = don't return)")
 
 
 class DetectOutliersRequest(BaseModel):
@@ -283,6 +286,7 @@ class FilterSet(BaseModel):
     label: Optional[str] = Field(default=None, description="Optional label for this filter set")
     filters: list[Union[FilterCondition, FilterGroup]] = Field(description="List of filter conditions or nested groups for this set")
     logic: Literal["AND", "OR"] = Field(default="AND", description="Logic operator for combining filters in this set")
+    sample_rows: Optional[int] = Field(default=None, description="Number of sample rows to return for this filter set")
 
 
 class FilterAndCountBatchRequest(BaseModel):

@@ -275,6 +275,10 @@ class DataOperations(BaseOperations):
         # Count filtered rows
         count = self._filter_engine.count_filtered(df, request.filters, request.logic)
 
+        # Get filtered DataFrame for sample_rows
+        filtered_df = self._filter_engine.apply_filters(df, request.filters, request.logic) if request.filters else df
+        sample_rows_data = self._add_sample_rows(filtered_df, request.sample_rows)
+
         # Generate Excel formula
         formula_gen = FormulaGenerator(request.sheet_name)
         
@@ -331,6 +335,7 @@ class DataOperations(BaseOperations):
             count=count,
             filters_applied=filters_applied,
             excel_output=excel_output,
+            sample_rows=sample_rows_data,
             metadata=metadata,
             performance=performance,
         )
@@ -448,6 +453,9 @@ class DataOperations(BaseOperations):
                 raise ValueError(error_msg)
             df = self._filter_engine.apply_filters(df, request.filters, request.logic)
 
+        # Store filtered df for sample_rows before aggregation
+        filtered_df_for_samples = df.copy()
+
         # Get column data
         col_data = df[actual_target_column]
 
@@ -547,12 +555,15 @@ class DataOperations(BaseOperations):
 
         performance = self._get_performance_metrics(start_time, len(df), True)
 
+        sample_rows_data = self._add_sample_rows(filtered_df_for_samples, request.sample_rows)
+
         return AggregateResponse(
             value=self._format_value(result),
             operation=operation,
             target_column=request.target_column,
             filters_applied=filters_applied,
             excel_output=excel_output,
+            sample_rows=sample_rows_data,
             metadata=metadata,
             performance=performance,
         )
@@ -703,6 +714,10 @@ class DataOperations(BaseOperations):
                 df, filter_set.filters, filter_set.logic
             )
 
+            # Get filtered DataFrame for sample_rows
+            filtered_df = self._filter_engine.apply_filters(df, filter_set.filters, filter_set.logic)
+            sample_rows_data = self._add_sample_rows(filtered_df, filter_set.sample_rows)
+
             # Serialize filters for response
             filters_applied = self._serialize_filters(filter_set.filters)
 
@@ -726,7 +741,8 @@ class DataOperations(BaseOperations):
                 label=filter_set.label,
                 count=count,
                 filters_applied=filters_applied,
-                formula=formula
+                formula=formula,
+                sample_rows=sample_rows_data
             ))
 
         # Generate TSV output

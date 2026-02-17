@@ -1579,3 +1579,78 @@ def test_group_by_nested_with_negation(simple_fixture, file_loader):
     assert all(group[simple_fixture.columns[0]] != test_value for group in response.groups), \
         f"No group should have {simple_fixture.columns[0]} == {test_value}"
     assert len(response.groups) > 0, "Should have some groups"
+
+
+# ============================================================================
+# SAMPLE_ROWS PARAMETER TESTS
+# ============================================================================
+
+def test_aggregate_with_sample_rows(numeric_types_fixture, file_loader):
+    """Test aggregate with sample_rows parameter.
+    
+    Verifies:
+    - sample_rows parameter returns sample data
+    - Sample data shows rows used in aggregation
+    - Values are formatted correctly
+    """
+    print(f"\n🔍 Testing aggregate with sample_rows")
+    
+    ops = DataOperations(file_loader)
+    
+    # Act
+    request = AggregateRequest(
+        file_path=numeric_types_fixture.path_str,
+        sheet_name=numeric_types_fixture.sheet_name,
+        operation="sum",
+        target_column="Количество",
+        filters=[
+            FilterCondition(column="Цена", operator=">", value=100)
+        ],
+        sample_rows=3
+    )
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Sum: {response.value}, Sample rows: {len(response.sample_rows) if response.sample_rows else 0}")
+    
+    assert response.sample_rows is not None, "Should return sample_rows"
+    assert isinstance(response.sample_rows, list), "sample_rows should be list"
+    assert len(response.sample_rows) <= 3, "Should return at most 3 rows"
+    
+    # Verify structure
+    if response.sample_rows:
+        assert all(isinstance(row, dict) for row in response.sample_rows), "Each row should be dict"
+        assert all("Количество" in row for row in response.sample_rows), "Should have target column"
+        assert all("Цена" in row for row in response.sample_rows), "Should have filter column"
+        # Verify filter was applied: all Цена > 100
+        assert all(row["Цена"] > 100 for row in response.sample_rows), "All samples should match filter"
+
+
+def test_aggregate_sample_rows_without_filters(simple_fixture, file_loader):
+    """Test aggregate with sample_rows but no filters.
+    
+    Verifies:
+    - sample_rows works without filters
+    - Returns samples from entire dataset
+    """
+    print(f"\n🔍 Testing aggregate with sample_rows (no filters)")
+    
+    ops = DataOperations(file_loader)
+    
+    # Act
+    request = AggregateRequest(
+        file_path=simple_fixture.path_str,
+        sheet_name=simple_fixture.sheet_name,
+        operation="count",
+        target_column=simple_fixture.columns[0],
+        filters=[],
+        sample_rows=5
+    )
+    response = ops.aggregate(request)
+    
+    # Assert
+    print(f"✅ Count: {response.value}, Sample rows: {len(response.sample_rows) if response.sample_rows else 0}")
+    
+    assert response.sample_rows is not None, "Should return sample_rows"
+    assert len(response.sample_rows) <= 5, "Should return at most 5 rows"
+    assert len(response.sample_rows) <= response.value, "Sample size should not exceed count"
