@@ -2,38 +2,107 @@
 
 # 📊 Excel MCP Server
 
-**MCP server for Excel file operations using atomic primitives**
+**Fast and efficient spreadsheet analysis through atomic operations, built specifically for AI agents**
 
 Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/tools-25-orange.svg)](#available-tools)
 [![Sponsor](https://img.shields.io/badge/💖_Sponsor-Support_Development-ff69b4)](#-support-the-project)
 
-Enables AI agents to analyze Excel files through composable operations without loading raw data into context
+**Analyze Excel spreadsheets with your AI agent through atomic operations — no data dumping into AI context**
 
-*Works with Claude Code, OpenCode, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
+*Works with OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
 
-[What You Can Do](#what-you-can-do) • [Installation](#installation) • [Configuration](#configuration) • [Available Tools](#available-tools) • [💖 Sponsor](#-support-the-project)
+[Why This Exists](#why-this-exists) • [What Your Agent Can Do](#what-your-agent-can-do) • [Installation](#installation) • [Configuration](#configuration) • [Available Tools](#available-tools) • [💖 Sponsor](#-support-the-project)
 
 </div>
 
 ---
 
-## What You Can Do
+## Why This Exists
 
-- 📊 **Analyze any Excel file** (.xls and .xlsx) without opening Excel
-- 🔍 **Filter and search** data with 12 operators (==, !=, >, <, in, contains, regex, etc.)
-- 📈 **Aggregate and group** data (sum, average, count, pivot tables)
-- 📉 **Statistical analysis** (correlations, outliers, distributions)
-- 📅 **Time series analysis** (period-over-period growth, moving averages, running totals)
-- 🏆 **Rank and sort** (top-N, bottom-N, percentiles)
-- ✅ **Validate data** (find duplicates, null values)
-- 🔄 **Compare sheets** (find differences between versions)
-- 📋 **Copy results to Excel** - generates formulas and TSV for instant paste
-- 🤖 **Works with any AI agent** - Claude Code, Cline, Roo Code, Cursor, and more
+**The Problem:** Most Excel tools for AI dump raw spreadsheet data into the agent's context. This floods the context window, slows everything down, and the AI can still miscalculate or get confused in large datasets.
+
+**This Project:** Think SQL for Excel. Your AI agent composes atomic operations (`filter_and_count`, `aggregate`, `group_by`) and gets back precise results—not thousands of rows.
+
+The agent analyzes data **without seeing it**. Results come as numbers, formulas, and insights.
+
+> *"This is like working with a database through SQL, not dragging everything into memory."*
+> — AI Agent after analyzing a production spreadsheet
+
+### What is MCP?
+
+[Model Context Protocol](https://modelcontextprotocol.io) is an open standard that lets AI agents use external tools.
+
+This server is such a tool. When you connect it to your AI agent (Claude Desktop, Cline, Roo Code, Cursor, etc.), your agent gets 25 new commands for working with Excel files—filtering, counting, aggregating, analyzing.
+
+**The key benefit:** Your AI doesn't load thousands of spreadsheet rows into its memory. Instead, it asks specific questions and gets precise answers. Faster, more accurate, no context overflow.
+
+---
+
+## What AI Agents Say About It
+
+Real feedback from AI agents that used this MCP server in production:
+
+> *"Analyzed 34,211 rows without loading data into context. Every operation returns just the result—count, sum, average. Context stays clean. Operations execute in 25-45ms regardless of file size."*
+
+> *"This is SQL for Excel. Query, filter, aggregate—without dumping data into context. Solid tool for analytical tasks."*
+
+> *"The filter system handles complex logic well. Nested AND/OR groups, 12 operators, unlimited conditions. Built a multi-category classification without writing code."*
+
+> *"Batch operations are efficient. One `filter_and_count_batch` call instead of multiple separate requests. File loads once, all filters apply, results come back together."*
+
+*Yes, agents write reviews now. These are actual reflections from AI agents analyzing real-world spreadsheet data. Welcome to 2026.*
+
+---
+
+## What Your Agent Can Do
+
+Once connected, your AI agent gets a lot of specialized tools for analyzing spreadsheet data. The agent receives only precise queries and reliable results.
+
+### 📊 Data Exploration
+- **Inspect files** - structure, sheets, columns, data types (auto-detects messy headers)
+- **Profile columns** - statistics, null counts, top values, data quality in one call
+- **Find data** - search across multiple sheets, locate columns anywhere
+
+### 🔍 Filtering & Querying
+- **12 filter operators** - `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`, `not_in`, `contains`, `startswith`, `endswith`, `regex`
+- **Complex logic** - nested AND/OR groups, NOT operator, unlimited conditions
+- **Batch operations** - classify data into multiple categories in one request (6x faster)
+- **Overlap analysis** - Venn diagrams, intersection counts, set operations
+
+### 📈 Aggregation & Analysis
+- **8 aggregation functions** - sum, mean, median, min, max, std, var, count
+- **Group by** - pivot tables with multiple grouping columns
+- **Statistical analysis** - correlations (Pearson/Spearman/Kendall), outlier detection (IQR/Z-score)
+- **Time series** - period-over-period growth, moving averages, running totals
+
+### 🏆 Advanced Operations
+- **Ranking** - top-N, bottom-N, percentile ranking (with grouping support)
+- **Calculated columns** - arithmetic expressions between columns
+- **Data validation** - find duplicates, null values, data quality checks
+- **Sheet comparison** - diff between versions, find changes
+
+### ⚡ Performance Features
+- **Atomic operations** - results in 20-50ms, no matter the file size
+- **Smart caching** - file loaded once, reused for all operations
+- **Sample rows** - preview filtered data without full retrieval
+- **Context protection** - smart limits prevent AI context overflow
+
+### 📋 Excel Integration
+- **Formula generation** - every result includes Excel formula for dynamic updates
+- **TSV output** - copy-paste results directly into Excel
+- **Legacy support** - works with old .xls files (Excel 97-2003)
+- **Multi-sheet** - analyze across multiple sheets in one file
+
+**Example queries your agent can now handle:**
+- *"Show me top 10 customers by revenue"*
+- *"Find all orders from Q4 where amount > $1000"*
+- *"Calculate month-over-month growth for each product category"*
+- *"Which customers are both VIP and active? (overlap analysis)"*
+- *"Find duplicates in the email column"*
 
 ## Prerequisites
 
@@ -137,715 +206,220 @@ poetry run python test_manual.py C:/Users/YourName/Documents/data.xlsx
 
 **Important:** Replace `C:/Users/YourName/Documents/data.xlsx` with the actual path to your Excel file.
 
-## Available Tools (25)
-
-### `inspect_file`
-
-Get basic information about Excel file structure.
+## Available Tools
 
 <details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx"
-}
-```
-
-**Output:**
-- File format and size
-- List of all sheets
-- Row/column counts for each sheet
-- Performance metrics
-
-</details>
-
-### `get_sheet_info`
-
-Get detailed information about a specific sheet.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "header_row": null  // Optional: auto-detected if not provided
-}
-```
-
-**Output:**
-- Column names and types
-- Row count
-- Sample data (first 3 rows)
-- Header detection info (if auto-detected)
-- Performance metrics
-
-</details>
-
-### `get_column_names`
-
-Quick operation to get just the column names.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales"
-}
-```
-
-**Output:**
-- List of column names
-- Column count
-
-</details>
-
-### `get_data_profile`
-
-Get comprehensive data profile for columns including type, statistics, null counts, and top values.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "columns": ["Price", "Quantity", "Status"],
-  "top_n": 5
-}
-```
-
-**Output:**
-- Column profiles with:
-  - Data type (integer, float, string, datetime, boolean)
-  - Total count, null count, null percentage
-  - Unique value count
-  - Statistical summary (for numeric columns): min, max, mean, median, std, quartiles
-  - Top N most frequent values with counts and percentages
-- TSV output for Excel
-- Performance metrics
-
-**Use case:** Combines multiple operations (get_column_stats, get_value_counts, find_nulls) into a single efficient call. Ideal for initial data exploration - get complete picture of your data in one request instead of 10+ separate calls.
-
-</details>
-
-### `get_unique_values`
-
-Get unique values from a column (useful for building filters).
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "column": "Customer",
-  "limit": 100
-}
-```
-
-**Output:**
-- List of unique values
-- Count of unique values
-- Truncated flag if limit exceeded
-
-</details>
-
-### `get_value_counts`
-
-Get frequency counts for values in a column (top N most common).
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "column": "Status",
-  "top_n": 10
-}
-```
-
-**Output:**
-- Dictionary of value -> count
-- Total number of values
-- TSV output for Excel
-
-</details>
-
-### `filter_and_count`
-
-Count rows matching filter conditions.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "filters": [
-    {"column": "Customer", "operator": "==", "value": "Acme Corp"},
-    {"column": "Amount", "operator": ">", "value": 1000}
-  ],
-  "logic": "AND"
-}
-```
-
-**Output:**
-- Count of matching rows
-- Excel formula (e.g., `=COUNTIFS(...)`)
-- Applied filters
-
-**Supported operators:** `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`, `not_in`, `contains`, `startswith`, `endswith`, `regex`, `is_null`, `is_not_null`
-
-</details>
-
-### `filter_and_count_batch`
-
-Count rows for multiple filter sets in a single call. Optimized for classification and segmentation tasks.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "filter_sets": [
-    {
-      "label": "Category A",
-      "filters": [
-        {"column": "Category", "operator": "==", "value": "A"}
-      ]
-    },
-    {
-      "label": "Category B",
-      "filters": [
-        {"column": "Category", "operator": "==", "value": "B"}
-      ]
-    },
-    {
-      "label": "High Value",
-      "filters": [
-        {"column": "Amount", "operator": ">", "value": 1000}
-      ]
-    }
-  ]
-}
-```
-
-**Output:**
-- Results for each filter set with count and formula
-- TSV table with all results for copy-paste to Excel
-- Performance metrics
-
-**Use case:** Much faster than multiple `filter_and_count` calls when you need to classify data into multiple categories. Loads file once, applies all filter sets, returns all counts in a single response.
-
-</details>
-
-### `analyze_overlap`
-
-Analyze overlap between multiple filter sets (Venn diagram analysis). Returns intersection counts, union, and exclusive zones.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "filter_sets": [
-    {
-      "label": "VIP Customers",
-      "filters": [
-        {"column": "CustomerType", "operator": "==", "value": "VIP"}
-      ]
-    },
-    {
-      "label": "Active Users",
-      "filters": [
-        {"column": "LastPurchase", "operator": ">=", "value": "2024-01-01"}
-      ]
-    }
-  ]
-}
-```
-
-**Output:**
-- Set information (count, percentage for each set)
-- Pairwise intersections (A ∩ B, A ∩ C, etc.)
-- Union count and percentage
-- Venn diagram data (for 2 or 3 sets)
-- TSV output for Excel
-- Performance metrics
-
-**Use case:** Optimized for classification, segmentation, and cross-sell analysis. Much faster than multiple separate calls (loads file once, applies all filters). Ideal for overlap analysis, Venn diagrams, market segmentation, finding customers who are both VIP AND active, analyzing product category overlaps, checking data consistency.
-
-**Examples:**
-- Find customers who are both VIP AND active
-- Analyze overlap between product categories
-- Segment users by multiple criteria
-- Check data consistency (orders completed BUT no completion date)
-
-</details>
-
-### `filter_and_get_rows`
-
-Get rows matching filter conditions with pagination.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "filters": [
-    {"column": "Status", "operator": "==", "value": "Active"}
-  ],
-  "columns": ["Customer", "Amount", "Date"],
-  "limit": 50,
-  "offset": 0,
-  "logic": "AND"
-}
-```
-
-**Output:**
-- Filtered rows as list of dictionaries
-- Total matches count
-- Truncated flag
-- TSV output for Excel
-
-</details>
-
-### `aggregate`
-
-Perform aggregation (sum, mean, count, etc.) on a column with optional filters.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "operation": "sum",
-  "target_column": "Amount",
-  "filters": [
-    {"column": "Customer", "operator": "==", "value": "Acme Corp"}
-  ]
-}
-```
-
-**Output:**
-- Aggregated value
-- Excel formula (e.g., `=SUMIF(...)`)
-- Applied filters
-
-**Supported operations:** `sum`, `mean`, `median`, `min`, `max`, `std`, `var`, `count`
-
-**Special feature:** Automatically converts text-stored numbers to numeric (common Excel issue).
-
-</details>
-
-### `group_by`
-
-Group data by columns and perform aggregation (like Excel Pivot Table).
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "group_columns": ["Customer", "Month"],
-  "agg_column": "Amount",
-  "agg_operation": "sum"
-}
-```
-
-**Output:**
-- Grouped data with aggregated values
-- TSV output for Excel
-- Supports multiple grouping columns
-
-</details>
-
-### `find_column`
-
-Find a column across all sheets or in a specific sheet.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "column_name": "Customer",
-  "search_all_sheets": true
-}
-```
-
-**Output:**
-- List of sheets where column was found
-- Column index and row count for each match
-- Case-insensitive search
-
-</details>
-
-### `search_across_sheets`
-
-Search for a specific value across all sheets in the file.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "column_name": "Customer",
-  "value": "Acme Corp"
-}
-```
-
-**Output:**
-- List of sheets with matches
-- Match count per sheet
-- Total matches across all sheets
-- Supports both numeric and string values
-
-</details>
-
-### `compare_sheets`
-
-Compare data between two sheets using a key column.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet1": "January",
-  "sheet2": "February",
-  "key_column": "Customer",
-  "compare_columns": ["Amount", "Quantity"]
-}
-```
-
-**Output:**
-- Rows with differences
-- Status for each row (only_in_sheet1, only_in_sheet2, different_values)
-- Side-by-side comparison of values
-- TSV output for Excel
-
-</details>
-
-### `get_column_stats`
-
-Get statistical summary of a column.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "column": "Amount"
-}
-```
-
-**Output:**
-- Count, mean, median, std, min, max
-- Quartiles (25th, 75th percentile)
-- Null count
-- TSV output for Excel
-
-</details>
-
-### `correlate`
-
-Calculate correlation matrix between multiple columns.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "columns": ["Amount", "Quantity", "Discount"],
-  "method": "pearson"
-}
-```
-
-**Output:**
-- Correlation matrix
-- Supports pearson, spearman, kendall methods
-- Works with 2+ columns
-- TSV output for Excel
-
-</details>
-
-### `detect_outliers`
-
-Detect outliers in a column using IQR or Z-score method.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "column": "Amount",
-  "method": "iqr",
-  "threshold": 1.5
-}
-```
-
-**Output:**
-- List of rows with outliers
-- Outlier count
-- Method and threshold used
-- TSV output for Excel
-
-</details>
-
-### `find_duplicates`
-
-Find duplicate rows based on specified columns.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "columns": ["Customer", "Date"]
-}
-```
-
-**Output:**
-- List of duplicate rows (all occurrences including first)
-- Duplicate count
-- Columns checked
-- TSV output for Excel
-- Row indices for each duplicate
-
-**Note:** Uses `duplicated(keep=False)` to mark all duplicates including first occurrence.
-
-</details>
-
-### `find_nulls`
-
-Find null/empty values in specified columns with detailed statistics.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "columns": ["Customer", "Amount", "Date"]
-}
-```
-
-**Output:**
-- Null statistics per column (count, percentage, indices)
-- Total null count across all checked columns
-- TSV output for Excel
-- First 100 null indices per column
-
-</details>
-
-### `calculate_period_change`
-
-Calculate period-over-period change (month/quarter/year growth).
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "date_column": "Date",
-  "value_column": "Revenue",
-  "period_type": "month"
-}
-```
-
-**Output:**
-- Periods with values and changes (absolute and percentage)
-- Excel formula for percentage change
-- TSV output for Excel
-
-**Period types:** `month`, `quarter`, `year`
-
-**Use case:** "Show month-over-month revenue growth"
-
-</details>
-
-### `calculate_running_total`
-
-Calculate running total (cumulative sum) ordered by a column.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "order_column": "Date",
-  "value_column": "Revenue",
-  "group_by_columns": ["Region"]
-}
-```
-
-**Output:**
-- Rows with running totals
-- Excel formula (e.g., `=SUM($B$2:B2)`)
-- TSV output for Excel
-- Supports grouping (running total within groups)
-
-**Use case:** "Calculate cumulative revenue by date"
-
-</details>
-
-### `calculate_moving_average`
-
-Calculate moving average with specified window size.
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "order_column": "Date",
-  "value_column": "Revenue",
-  "window_size": 7
-}
-```
-
-**Output:**
-- Rows with moving averages
-- Excel formula (e.g., `=AVERAGE(B1:B7)`)
-- TSV output for Excel
-
-**Use case:** "7-day moving average of daily sales"
-
-</details>
-
-### `rank_rows`
-
-Rank rows by column value (ascending or descending).
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "rank_column": "Revenue",
-  "direction": "desc",
-  "top_n": 10,
-  "group_by_columns": ["Region"]
-}
-```
-
-**Output:**
-- Ranked rows with rank numbers
-- Excel formula (e.g., `=RANK(B2,$B$2:$B$100,0)`)
-- TSV output for Excel
-- Supports top-N filtering
-- Supports ranking within groups
-
-**Use case:** "Top 10 customers by revenue in each region"
-
-</details>
-
-### `calculate_expression`
-
-Calculate expression between columns (arithmetic operations).
-
-<details>
-<summary>View Input/Output</summary>
-
-**Input:**
-```json
-{
-  "file_path": "/path/to/file.xlsx",
-  "sheet_name": "Sales",
-  "expression": "Price * Quantity",
-  "output_column_name": "Total"
-}
-```
-
-**Output:**
-- Rows with calculated values
-- Excel formula (e.g., `=A2*B2`)
-- TSV output for Excel
-
-**Supported operations:** `+`, `-`, `*`, `/`, parentheses
-
-**Use cases:**
-- "Calculate revenue = Price * Quantity"
-- "Calculate margin = (Revenue - Cost) / Revenue"
-- "Calculate average speed = Distance / Time"
+<summary><b>📋 Complete Tool Reference (25 tools) - Click to expand</b></summary>
+
+### 📊 File Inspection (5 tools)
+
+#### `inspect_file`
+Get file structure overview - sheets, dimensions, format.
+**Use for:** Initial file exploration, sheet discovery, format validation
+**Returns:** Sheet list, row/column counts, file metadata
+
+#### `get_sheet_info`
+Detailed sheet analysis with auto-header detection.
+**Use for:** Understanding data structure, column types, sample preview
+**Returns:** Column names/types, row count, sample data (3 rows), header detection info
+
+#### `get_column_names`
+Quick column enumeration without loading full data.
+**Use for:** Schema validation, filter building, column availability checks
+**Returns:** Column name list, column count
+
+#### `get_data_profile`
+Comprehensive column profiling - types, stats, nulls, top values.
+**Use for:** Initial data exploration, quality assessment, distribution analysis
+**Returns:** Per-column: type, null %, unique count, stats (numeric), top N values
+**Efficiency:** Replaces 10+ separate calls (get_column_stats + get_value_counts + find_nulls)
+
+#### `find_column`
+Locate column across multiple sheets.
+**Use for:** Multi-sheet navigation, data discovery, cross-sheet analysis
+**Returns:** Sheet list with column locations, indices, row counts (case-insensitive)
+
+---
+
+### 📥 Data Retrieval (3 tools)
+
+#### `get_unique_values`
+Extract unique values from a column.
+**Use for:** Data exploration, filter building, distinct value discovery, data quality checks
+**Returns:** Unique value list, count, truncated flag (if limit exceeded)
+**Default limit:** 100 values
+
+#### `get_value_counts`
+Frequency analysis - top N most common values.
+**Use for:** Distribution analysis, identifying dominant categories, data imbalance detection
+**Returns:** Value → count dictionary, total count, TSV output
+**Default:** Top 10 values
+
+#### `filter_and_get_rows`
+Retrieve filtered rows with pagination.
+**Use for:** Data extraction, sample inspection, detailed analysis, export
+**Returns:** Filtered rows (list of dicts), total count, TSV output
+**Pagination:** limit/offset support
+
+---
+
+### 🔍 Filtering & Counting (3 tools)
+
+#### `filter_and_count`
+Count rows matching conditions with 14 operators.
+**Operators:** `==`, `!=`, `>`, `<`, `>=`, `<=`, `in`, `not_in`, `contains`, `startswith`, `endswith`, `regex`, `is_null`, `is_not_null`
+**Logic:** Nested AND/OR groups, NOT operator, unlimited conditions
+**Use for:** Classification, segmentation, data validation, category counting
+**Returns:** Count + Excel formula (COUNTIFS), optional sample rows
+
+#### `filter_and_count_batch`
+Classify data into multiple categories in one call (6x faster).
+**Use for:** Multi-category classification, market segmentation, quality control
+**Returns:** Count + formula per category, TSV table for Excel
+**Efficiency:** Loads file once, applies all filters, returns all results
+
+#### `analyze_overlap`
+Venn diagram analysis - intersections, unions, exclusive zones.
+**Use for:** Overlap analysis, cross-sell opportunities, data consistency checks
+**Returns:** Set counts, pairwise intersections (A ∩ B), union, Venn data (2-3 sets)
+**Examples:** VIP AND active customers, product category overlaps, completed orders WITHOUT completion date
+
+---
+
+### 📈 Aggregation & Analysis (2 tools)
+
+#### `aggregate`
+Perform aggregation with optional filters (8 operations).
+**Operations:** `sum`, `mean`, `median`, `min`, `max`, `std`, `var`, `count`
+**Use for:** Totals, averages, statistical summaries, conditional aggregations, KPIs
+**Returns:** Aggregated value + Excel formula (SUMIF, AVERAGEIF, etc.)
+**Special:** Auto-converts text-stored numbers to numeric
+
+#### `group_by`
+Pivot table with multi-column grouping.
+**Use for:** Category analysis, hierarchical grouping, sales by region/product
+**Returns:** Grouped data with aggregated values, TSV output
+**Supports:** Multiple grouping columns, all 8 aggregation operations
+
+---
+
+### 📊 Statistics (3 tools)
+
+#### `get_column_stats`
+Statistical summary - count, mean, median, std, quartiles.
+**Use for:** Distribution analysis, data profiling, outlier detection prep
+**Returns:** Full stats (min, max, mean, median, std, Q1, Q3), null count, TSV output
+
+#### `correlate`
+Correlation matrix between 2+ columns.
+**Methods:** Pearson (linear), Spearman (rank-based), Kendall (rank-based)
+**Use for:** Relationship analysis, variable dependency, feature selection
+**Returns:** Correlation matrix (-1 to 1), TSV output
+
+#### `detect_outliers`
+Anomaly detection using IQR or Z-score.
+**Methods:** IQR (robust), Z-score (assumes normal distribution)
+**Use for:** Fraud detection, sensor errors, data quality, unusual value identification
+**Returns:** Outlier rows with indices, count, method/threshold used
+
+---
+
+### ✅ Data Validation (2 tools)
+
+#### `find_duplicates`
+Detect duplicate rows by specified columns.
+**Use for:** Data quality, deduplication planning, integrity checks
+**Returns:** All duplicate rows (including first occurrence), count, indices
+**Note:** Uses `duplicated(keep=False)` to mark all duplicates
+
+#### `find_nulls`
+Find null/empty values with detailed statistics.
+**Use for:** Completeness checks, missing value analysis, data cleaning
+**Returns:** Per-column: null count, percentage, indices (first 100)
+**Note:** Placeholders (".", "-") are NOT null - use `==` or `in` operators
+
+---
+
+### 🔄 Multi-Sheet Operations (2 tools)
+
+#### `search_across_sheets`
+Search value across all sheets.
+**Use for:** Cross-sheet search, value tracking, data location
+**Returns:** Sheet list with match counts, total matches
+**Supports:** Numeric and string values
+
+#### `compare_sheets`
+Diff between two sheets using key column.
+**Use for:** Version comparison, change detection, reconciliation, audit trails
+**Returns:** Rows with differences, status (only_in_sheet1/sheet2/different_values), side-by-side comparison
+
+---
+
+### 📅 Time Series (3 tools)
+
+#### `calculate_period_change`
+Period-over-period growth analysis.
+**Periods:** month, quarter, year
+**Use for:** Trend analysis, growth tracking, seasonal comparison, YoY analysis
+**Returns:** Periods with values, absolute/percentage changes, Excel formula
+
+#### `calculate_running_total`
+Cumulative sum with optional grouping.
+**Use for:** Cumulative analysis, progress tracking, balance calculations, cash flow
+**Returns:** Rows with running totals, Excel formula (SUM($B$2:B2))
+**Supports:** Grouping (running total resets per group)
+
+#### `calculate_moving_average`
+Smoothing with specified window size.
+**Use for:** Trend detection, noise reduction, pattern identification
+**Returns:** Rows with moving averages, Excel formula (AVERAGE(B1:B7))
+**Examples:** 7-day moving average, 30-day stock price smoothing
+
+---
+
+### 🏆 Advanced Operations (2 tools)
+
+#### `rank_rows`
+Rank by column value with top-N filtering.
+**Directions:** desc (highest first), asc (lowest first)
+**Use for:** Leaderboards, top/bottom analysis, percentile ranking
+**Returns:** Ranked rows with rank numbers, Excel formula (RANK)
+**Supports:** Top-N filtering, ranking within groups
+
+#### `calculate_expression`
+Arithmetic expressions between columns.
+**Operations:** `+`, `-`, `*`, `/`, parentheses
+**Use for:** Derived metrics, financial calculations, ratio analysis, KPIs
+**Returns:** Calculated values, Excel formula (e.g., =A2*B2)
+**Examples:** Revenue = Price * Quantity, Margin = (Revenue - Cost) / Revenue
 
 </details>
 
 ## Roadmap
 
-- Write operations (xlsx only)
-- CSV support
-- SSE transport mode
-- Advanced formula generation
+### 📁 File Format Support
+
+**Currently Supported:**
+- ✅ **XLS** - Excel 97-2003 (read-only)
+- ✅ **XLSX** - Excel 2007+ (read-only)
+
+**Planned:**
+- 🔜 **XLSM** - Excel with macros support
+- 🔜 **CSV** - Comma-separated values
+- 🔜 **TSV** - Tab-separated values
+- 🔜 **ODS** - OpenDocument Spreadsheet
+- 🔜 **Parquet** - Columnar storage format
+
+### 🚀 Features
+
+- **Write operations** - Modify spreadsheets files (create calculated columns, update values)
+- **SSE transport mode** - Server-Sent Events for remote access
+- **Advanced formula generation** - More complex Excel formulas with nested functions
+- **Data export** - Export filtered/aggregated results to new files
 
 ---
 
-## 📜 License
+## License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
