@@ -158,8 +158,9 @@ class FileLoader:
         engine = self._get_engine(file_format)
 
         try:
-            excel_file = pd.ExcelFile(path, engine=engine)
-            return excel_file.sheet_names
+            # Use context manager to ensure file is closed (prevents descriptor leaks)
+            with pd.ExcelFile(path, engine=engine) as excel_file:
+                return excel_file.sheet_names
         except Exception as e:
             raise Exception(f"Failed to read sheet names from {file_path}: {str(e)}") from e
 
@@ -277,31 +278,30 @@ class FileLoader:
             return {}
         
         try:
-            wb = openpyxl.load_workbook(file_path, data_only=False, read_only=True)
-            
-            # Get worksheet
-            if isinstance(sheet_name, int):
-                ws = wb.worksheets[sheet_name]
-            elif isinstance(sheet_name, str):
-                ws = wb[sheet_name]
-            else:
-                ws = wb.active
-            
-            formats = {}
-            
-            # Read formats from first data row (row 2, assuming row 1 is header)
-            # We sample multiple rows to get more reliable format detection
-            for row_idx in range(2, min(12, ws.max_row + 1)):  # Sample up to 10 data rows
-                for col_idx, cell in enumerate(ws[row_idx], start=0):
-                    if cell.number_format and cell.number_format != 'General':
-                        col_key = str(col_idx)
-                        if col_key not in formats:
-                            formats[col_key] = []
-                        if cell.number_format not in formats[col_key]:
-                            formats[col_key].append(cell.number_format)
-            
-            wb.close()
-            return formats
+            # Use context manager to ensure file is closed (prevents descriptor leaks)
+            with openpyxl.load_workbook(file_path, data_only=False, read_only=True) as wb:
+                # Get worksheet
+                if isinstance(sheet_name, int):
+                    ws = wb.worksheets[sheet_name]
+                elif isinstance(sheet_name, str):
+                    ws = wb[sheet_name]
+                else:
+                    ws = wb.active
+                
+                formats = {}
+                
+                # Read formats from first data row (row 2, assuming row 1 is header)
+                # We sample multiple rows to get more reliable format detection
+                for row_idx in range(2, min(12, ws.max_row + 1)):  # Sample up to 10 data rows
+                    for col_idx, cell in enumerate(ws[row_idx], start=0):
+                        if cell.number_format and cell.number_format != 'General':
+                            col_key = str(col_idx)
+                            if col_key not in formats:
+                                formats[col_key] = []
+                            if cell.number_format not in formats[col_key]:
+                                formats[col_key].append(cell.number_format)
+                
+                return formats
             
         except Exception:
             return {}

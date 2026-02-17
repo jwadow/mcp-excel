@@ -234,10 +234,10 @@ def mcp_server() -> Generator[MCPServerProcess, None, None]:
         [sys.executable, "-m", "mcp_excel.main"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,  # Discard stderr to prevent buffer deadlock
         text=True,
         encoding="utf-8",
-        bufsize=1,  # Line buffered - critical for Windows
+        bufsize=-1,  # System buffer (~64KB) - prevents STDIO deadlock with large responses
         cwd=str(Path(__file__).parent.parent.parent)  # Project root
     )
     
