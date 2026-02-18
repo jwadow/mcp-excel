@@ -6,7 +6,7 @@
 
 [🇬🇧 English](../../README.md) • [🇷🇺 Русский](../ru/README.md) • [🇨🇳 中文](../zh/README.md) • 🇪🇸 Español • [🇯🇵 日本語](../ja/README.md) • [🇧🇷 Português](../pt/README.md)
 
-Hecho con ❤️ por [@Jwadow](https://github.com/jwadow)
+Hecho con ❤️ para mamá por [@Jwadow](https://github.com/jwadow)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -17,9 +17,20 @@ Hecho con ❤️ por [@Jwadow](https://github.com/jwadow)
 
 *Funciona con OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code y otros agentes de IA compatibles con MCP*
 
-[Por qué existe esto](#-por-qué-existe-esto) • [Qué puede hacer tu agente](#-qué-puede-hacer-tu-agente) • [Instalación y configuración](#%EF%B8%8F-instalación-y-configuración) • [Herramientas disponibles](#%EF%B8%8F-herramientas-disponibles) • [💖 Donar](#-apoya-el-proyecto)
+[Por qué existe esto](#-por-qué-existe-esto) • [La opinión de mi mamá](#-la-opinión-de-mi-mamá) • [Qué puede hacer tu agente](#-qué-puede-hacer-tu-agente) • [Instalación](#%EF%B8%8F-instalación-y-configuración) • [💖 Donar](#-apoya-el-proyecto)
 
 </div>
+
+---
+
+## 🔒 Seguridad y privacidad de datos
+
+**Arquitectura local primero**
+Este servidor se ejecuta completamente en tu computadora local. Tus archivos Excel se procesan localmente y **nunca salen de tu equipo**.
+
+**¿Es seguro?**
+*   **Modelos locales (Ollama, LM Studio):** Tus datos **nunca** salen de tu máquina. 100% privado.
+*   **Modelos en la nube (OpenRouter, ChatGPT):** Solo se envían al modelo los *resultados precisos* de las operaciones (conteos, sumas, fórmulas) y metadatos (nombres de columnas). Los datos en bruto permanecen en tu disco.
 
 ---
 
@@ -44,19 +55,9 @@ Este proyecto es una de esas herramientas. Cuando conectas este servidor a tu ag
 
 ---
 
-## 💬 Lo que dicen los agentes de IA
+## 👩 La opinión de mi mamá
 
-Feedback real de agentes de IA que usaron este servidor MCP en producción:
-
-> *"Analicé 34,211 filas sin cargar datos en el contexto. Cada operación devuelve solo el resultado — conteo, suma, promedio. El contexto se mantiene limpio. Las operaciones se ejecutan en 25-45ms independientemente del tamaño del archivo."*
-
-> *"Esto es SQL para Excel. Consultas, filtros, agregación — sin volcar datos en el contexto. Herramienta sólida para tareas analíticas."*
-
-> *"El sistema de filtros maneja bien la lógica compleja. Grupos AND/OR anidados, 12 operadores, condiciones ilimitadas. Construí una clasificación multicategoría sin escribir código."*
-
-> *"Las operaciones por lotes son eficientes. Una llamada a `filter_and_count_batch` en lugar de múltiples solicitudes separadas. El archivo se carga una vez, se aplican todos los filtros, los resultados llegan juntos."*
-
-*Sí, los agentes ahora escriben reseñas. Estas son reflexiones reales de agentes de IA analizando datos de hojas de cálculo del mundo real. Bienvenido a 2026.*
+> *"Normalmente me lleva como una hora armar esta tabla, filtrar por categorías, copiar a diferentes columnas, calcular los totales. Le di la tarea y lo hizo todo en 3 minutos. Lo revisé y está bien. Ahora con cualquier cosa es igual, solo escribo lo que necesito y lo hace. La verdad me quedé impactada. Media vida haciendo esto a mano y ahora la computadora entiende lo que necesito. De verdad ahorro un montón de tiempo."*
 
 ---
 

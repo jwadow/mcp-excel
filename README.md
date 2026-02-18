@@ -6,7 +6,7 @@
 
 🇬🇧 English • [🇷🇺 Русский](docs/ru/README.md) • [🇨🇳 中文](docs/zh/README.md) • [🇪🇸 Español](docs/es/README.md) • [🇯🇵 日本語](docs/ja/README.md) • [🇧🇷 Português](docs/pt/README.md)
 
-Made with ❤️ by [@Jwadow](https://github.com/jwadow)
+Made with ❤️ for mom by [@Jwadow](https://github.com/jwadow)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -17,9 +17,20 @@ Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
 *Works with OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
 
-[Why This Exists](#-why-this-exists) • [What Your Agent Can Do](#-what-your-agent-can-do) • [Installation & Configuration](#%EF%B8%8F-installation--configuration) • [Available Tools](#%EF%B8%8F-available-tools) • [💖 Donate](#-support-the-project)
+[Why This Exists](#-why-this-exists) • [My Mom's Review](#-my-moms-review) • [What Your Agent Can Do](#-what-your-agent-can-do) • [Installation](#%EF%B8%8F-installation--configuration) • [💖 Donate](#-support-the-project)
 
 </div>
+
+---
+
+## 🔒 Data Security & Privacy
+
+**Local-First Architecture**
+This server runs entirely on your local machine. Your Excel files are processed locally and **never leave your computer**.
+
+**Is it safe?**
+*   **Local Models (Ollama, LM Studio):** Your data **never** leaves your machine. 100% private.
+*   **Cloud Models (OpenRouter, ChatGPT):** Only the *precise results* of operations (counts, sums, formulas) and metadata (column names) are sent to the model. The bulk raw data remains on your disk.
 
 ---
 
@@ -44,19 +55,9 @@ This project is such a tool. When you connect this server to your AI agent (Open
 
 ---
 
-## 💬 What AI Agents Say About It
+## 👩 My Mom's Review
 
-Real feedback from AI agents that used this MCP server in production:
-
-> *"Analyzed 34,211 rows without loading data into context. Every operation returns just the result — count, sum, average. Context stays clean. Operations execute in 25-45ms regardless of file size."*
-
-> *"This is SQL for Excel. Query, filter, aggregate — without dumping data into context. Solid tool for analytical tasks."*
-
-> *"The filter system handles complex logic well. Nested AND/OR groups, 12 operators, unlimited conditions. Built a multi-category classification without writing code."*
-
-> *"Batch operations are efficient. One `filter_and_count_batch` call instead of multiple separate requests. File loads once, all filters apply, results come back together."*
-
-*Yes, agents write reviews now. These are actual reflections from AI agents analyzing real-world spreadsheet data. Welcome to 2026.*
+> *"Usually takes me an hour to break down this spreadsheet, filter by categories, copy into different columns, calculate totals. Gave it the task and it did everything in 3 minutes. Checked it and its correct. Now its like this with any task, just write what I need and it does it. I'm honestly shocked. Half my life I've been doing this by hand and the computer just gets what I need. Saving so much time for real."*
 
 ---
 
