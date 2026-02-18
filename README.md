@@ -4,6 +4,8 @@
 
 **Fast and efficient spreadsheet analysis through atomic operations, built specifically for AI agents**
 
+🇬🇧 English • [🇷🇺 Русский](docs/ru/README.md) • [🇨🇳 中文](docs/zh/README.md) • [🇪🇸 Español](docs/es/README.md) • [🇯🇵 日本語](docs/ja/README.md) • [🇧🇷 Português](docs/pt/README.md)
+
 Made with ❤️ by [@Jwadow](https://github.com/jwadow)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -36,7 +38,7 @@ The agent analyzes data **without seeing it**. Results come as numbers, formulas
 
 [Model Context Protocol](https://modelcontextprotocol.io) is an open standard that lets AI agents use external tools.
 
-This server is such a tool. When you connect it to your AI agent (Claude Desktop, Cline, Roo Code, Cursor, etc.), your agent gets 25 new commands for working with Excel files — filtering, counting, aggregating, analyzing.
+This project is such a tool. When you connect this server to your AI agent (OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code, etc.), your agent gets a lot of new commands for working with Excel files — filtering, counting, aggregating, analyzing.
 
 **The key benefit:** Your AI doesn't load thousands of spreadsheet rows into its memory. Instead, it asks specific questions and gets precise answers. Faster, more accurate, no context overflow.
 
@@ -48,7 +50,7 @@ Real feedback from AI agents that used this MCP server in production:
 
 > *"Analyzed 34,211 rows without loading data into context. Every operation returns just the result — count, sum, average. Context stays clean. Operations execute in 25-45ms regardless of file size."*
 
-> *"This is SQL for Excel. Query, filter, aggregate—without dumping data into context. Solid tool for analytical tasks."*
+> *"This is SQL for Excel. Query, filter, aggregate — without dumping data into context. Solid tool for analytical tasks."*
 
 > *"The filter system handles complex logic well. Nested AND/OR groups, 12 operators, unlimited conditions. Built a multi-category classification without writing code."*
 
@@ -124,7 +126,8 @@ cd mcp-excel
 <details>
 <summary><b>🎯 Option A: Poetry (Recommended)</b></summary>
 
-*Poetry is a modern Python dependency manager (replaces pip+venv+requirements.txt). [Install it](https://python-poetry.org/docs/#installation): `pip install poetry` or `pipx install poetry`*
+Poetry is a modern Python dependency manager (replaces pip+venv+requirements.txt).
+[Install it](https://python-poetry.org/docs/#installation): `pip install poetry` or `pipx install poetry`
 
 **Install dependencies:**
 ```bash
@@ -197,7 +200,7 @@ Add this to your MCP settings (JSON config):
 </details>
 
 <details>
-<summary><b>⚠️ Option C: System Python (Not Recommended)</b></summary>
+<summary><b>🐍 Option C: System Python (Not Recommended)</b></summary>
 
 **Install dependencies globally:**
 ```bash
@@ -496,7 +499,7 @@ Every contribution helps keep this project alive and growing
 
 ### 🤑 Donate
 
-[**☕ One-time Donation**](https://app.lava.top/jwadow?tabId=donate) &nbsp;•&nbsp; [**💎 Monthly Support**](https://app.lava.top/jwadow?tabId=subscriptions)
+[**☕ One-time Donation**](https://app.lava.top/jwadow?tabId=donate) • [**💎 Monthly Support**](https://app.lava.top/jwadow?tabId=subscriptions)
 
 <br>
 
