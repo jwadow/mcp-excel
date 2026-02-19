@@ -57,6 +57,8 @@ This project is such a tool. When you connect this server to your AI agent (Open
 
 ## 👩 My Mom's Review
 
+Translated from Russian. She's not a tech person - types with one finger, uses Excel every day for work.
+
 > *"Usually takes me an hour to break down this spreadsheet, filter by categories, copy into different columns, calculate totals. Gave it the task and it did everything in 3 minutes. Checked it and its correct. Now its like this with any task, just write what I need and it does it. I'm honestly shocked. Half my life I've been doing this by hand and the computer just gets what I need. Saving so much time for real."*
 
 ---

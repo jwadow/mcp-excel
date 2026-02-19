@@ -57,6 +57,8 @@ Este proyecto es una de esas herramientas. Cuando conectas este servidor a tu ag
 
 ## 👩 La opinión de mi mamá
 
+Traducido del ruso. No es una persona técnica - escribe con un dedo, usa Excel todos los días para el trabajo.
+
 > *"Normalmente me lleva como una hora armar esta tabla, filtrar por categorías, copiar a diferentes columnas, calcular los totales. Le di la tarea y lo hizo todo en 3 minutos. Lo revisé y está bien. Ahora con cualquier cosa es igual, solo escribo lo que necesito y lo hace. La verdad me quedé impactada. Media vida haciendo esto a mano y ahora la computadora entiende lo que necesito. De verdad ahorro un montón de tiempo."*
 
 ---

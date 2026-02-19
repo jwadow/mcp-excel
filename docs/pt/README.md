@@ -57,6 +57,8 @@ Este projeto é uma dessas ferramentas. Quando você conecta este servidor ao se
 
 ## 👩 A opinião da minha mãe
 
+Traduzido do russo. Ela não é uma pessoa técnica - digita com um dedo, usa Excel todo dia no trabalho.
+
 > *"Normalmente levo uma hora pra organizar essa planilha, filtrar por categoria, copiar pras colunas diferentes, calcular os totais. Passei a tarefa e fez tudo em 3 minutos. Conferi e tá certinho. Agora é assim com qualquer coisa, só escrevo o que preciso e ele faz. Fiquei chocada de verdade. Metade da vida fazendo isso na mão e agora o computador entende o que eu preciso. Economiza muito tempo mesmo."*
 
 ---
