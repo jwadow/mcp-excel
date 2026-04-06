@@ -156,15 +156,53 @@ FILTER_GROUP_SCHEMA = {
 
 # Filter property schema - for use in inputSchema properties (without definitions)
 # This is the structure for the "filters" property itself
-FILTER_PROPERTY_SCHEMA = {
-    "type": "array",
-    "description": "List of filter conditions or nested groups. Supports complex logical expressions like (A AND B) OR C.",
-    "items": {
-        "oneOf": [
-            FILTER_CONDITION_SCHEMA,
-            {"$ref": "#/definitions/FilterGroup"}
-        ]
-    }
+# FILTER_PROPERTY_SCHEMA = {
+#     "type": "array",
+#     "description": "List of filter conditions or nested groups. Supports complex logical expressions like (A AND B) OR C.",
+#     "items": {
+#         "oneOf": [
+#             FILTER_CONDITION_SCHEMA,
+#             {"$ref": "#/definitions/FilterGroup"}
+#         ]
+#     }
+# }
+FILTER_NODE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["condition", "group"],
+            "description": "Node type"
+        },
+
+        # condition fields
+        "column": {"type": "string"},
+        "operator": {
+            "type": "string",
+            "enum": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in",
+                     "contains", "startswith", "endswith", "regex",
+                     "is_null", "is_not_null"]
+        },
+        "value": {},
+        "values": {"type": "array"},
+
+        # group fields
+        "filters": {
+            "type": "array",
+            "items": {"type": "object"}  # 👈 no recursion enforcement
+        },
+        "logic": {
+            "type": "string",
+            "enum": ["AND", "OR"],
+            "default": "AND"
+        },
+
+        "negate": {
+            "type": "boolean",
+            "default": False
+        }
+    },
+    "required": ["type"]
 }
 
 # Filter definitions - must be placed at root level of inputSchema
@@ -402,7 +440,10 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Name of the sheet",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -448,7 +489,10 @@ class MCPExcelServer:
                                             "type": "string",
                                             "description": "Optional label for this filter set (e.g., 'Category A', 'Active items'). If not provided, will be labeled as 'Set 1', 'Set 2', etc."
                                         },
-                                        "filters": FILTER_PROPERTY_SCHEMA,
+                                        "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                                         "logic": {
                                             "type": "string",
                                             "enum": ["AND", "OR"],
@@ -498,7 +542,10 @@ class MCPExcelServer:
                                             "type": "string",
                                             "description": "Optional label for this filter set (e.g., 'VIP customers', 'Active users'). If not provided, will be labeled as 'Set 1', 'Set 2', etc."
                                         },
-                                        "filters": FILTER_PROPERTY_SCHEMA,
+                                        "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                                         "logic": {
                                             "type": "string",
                                             "enum": ["AND", "OR"],
@@ -532,7 +579,10 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Name of the sheet",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "columns": {
                                 "type": "array",
                                 "items": {"type": "string"},
@@ -586,7 +636,10 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Column to aggregate (must be numeric for sum/mean/median/min/max/std/var)",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -634,7 +687,10 @@ class MCPExcelServer:
                                 "enum": ["sum", "mean", "median", "min", "max", "std", "var", "count"],
                                 "description": "Aggregation operation: sum (total), mean (average), median (middle value), min (minimum), max (maximum), std (standard deviation), var (variance), count (row count)",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -668,7 +724,10 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Column name to analyze (should be numeric for meaningful statistics)",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -713,7 +772,10 @@ class MCPExcelServer:
                                 "description": "Correlation method: pearson (linear relationships), spearman (rank-based, handles outliers), kendall (rank-based, more robust). Default: pearson",
                                 "default": "pearson",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -903,7 +965,10 @@ class MCPExcelServer:
                                 "enum": ["month", "quarter", "year"],
                                 "description": "Period type for grouping: month (monthly comparison), quarter (quarterly comparison), year (yearly comparison)",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -946,7 +1011,10 @@ class MCPExcelServer:
                                 "items": {"type": "string"},
                                 "description": "Optional columns to group by (running total resets within each group). Example: [Region] calculates running total per region.",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -988,7 +1056,10 @@ class MCPExcelServer:
                                 "type": "integer",
                                 "description": "Number of periods for moving average window (e.g., 7 for 7-day average, 30 for 30-day average)",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -1037,7 +1108,10 @@ class MCPExcelServer:
                                 "items": {"type": "string"},
                                 "description": "Optional columns to group by (ranking resets within each group). Example: [Region] ranks within each region separately.",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -1075,7 +1149,10 @@ class MCPExcelServer:
                                 "type": "string",
                                 "description": "Name for the calculated column (e.g., 'Total', 'Margin', 'Profit')",
                             },
-                            "filters": FILTER_PROPERTY_SCHEMA,
+                            "filters": {
+                                "type": "array",
+                                "items": FILTER_NODE_SCHEMA
+                            },
                             "logic": {
                                 "type": "string",
                                 "enum": ["AND", "OR"],
@@ -1098,6 +1175,16 @@ class MCPExcelServer:
             """Handle tool calls."""
             try:
                 logger.info(f"Tool called: {name} with arguments: {arguments}")
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+
+                result = []
+                for f in arguments.get('filters', []):
+                    if isinstance(f, str):
+                        f = json.loads(f)
+                    result.append(f)
+                if 'filters' in arguments:
+                    arguments['filters'] = result
 
                 if name == "inspect_file":
                     request = InspectFileRequest(**arguments)

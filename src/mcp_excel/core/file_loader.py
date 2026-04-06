@@ -5,7 +5,10 @@
 
 """File loader with automatic format detection and caching."""
 
+import glob
+import logging
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -19,15 +22,117 @@ from .datetime_detector import DateTimeDetector
 class FileLoader:
     """Loads Excel files with automatic format detection and caching."""
 
-    def __init__(self, cache: Optional[FileCache] = None) -> None:
+    # Regex pattern for UUID prefix (8-4-4-4-12 hex digits)
+    _UUID_PATTERN = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_')
+
+    def __init__(
+        self,
+        cache: Optional[FileCache] = None,
+        base_dirs: Optional[List[str]] = None,
+    ) -> None:
         """Initialize file loader.
 
         Args:
             cache: Optional FileCache instance. If None, creates default cache.
+            base_dirs: List of base directories to search for files.
+                      If not provided, reads from MCP_FILE_DIRS environment variable
+                      (colon-separated on Unix, semicolon-separated on Windows).
         """
         self._cache = cache or FileCache()
         self._datetime_detector = DateTimeDetector()
         self._datetime_converter = DateTimeConverter()
+        
+        # Configure logging
+        self._logger = logging.getLogger(__name__)
+        
+        # Set base directories
+        if base_dirs is not None:
+            self._base_dirs = [Path(d).resolve() for d in base_dirs]
+        else:
+            # Read from environment variable
+            env_value = os.environ.get("MCP_FILE_DIRS", "")
+            if env_value:
+                # Handle both colon (Unix) and semicolon (Windows) separators
+                separator = ";" if os.name == "nt" else ":"
+                dirs = [d.strip() for d in env_value.split(separator) if d.strip()]
+                self._base_dirs = [Path(d).resolve() for d in dirs]
+            else:
+                # Default base directories for Docker environment
+                self._base_dirs = [
+                    Path("/app/backend/data/uploads"),
+                    Path("/data/uploads"),
+                    Path("/uploads"),
+                ]
+
+        self._logger.debug(f"Initialized FileLoader with base_dirs: {self._base_dirs}")
+
+    def _resolve_path(self, file_path: str | Path) -> Path:
+        """Resolve file path with flexible search logic for Docker environments.
+
+        This method handles cases where uploaded files have UUID-prefixed filenames
+        (e.g., <uuid>_BI-reportTasks.xlsx) by searching in predefined base directories
+        and matching patterns when exact filename is not found.
+
+        Args:
+            file_path: Path to the file (string or Path object). Can be a simple
+                      filename like "BI-reportTasks.xlsx" or a full path.
+
+        Returns:
+            Absolute Path that exists on the filesystem.
+
+        Raises:
+            FileNotFoundError: If file cannot be found in any base directory.
+        """
+        # Convert to Path if string
+        path = Path(file_path) if isinstance(file_path, str) else file_path
+        
+        # Try direct existence check first (backward compatibility for absolute paths)
+        if path.exists():
+            self._logger.debug(f"Direct path found: {path}")
+            return path.resolve()
+        
+        # If it's an absolute path that doesn't exist, don't search - just fail
+        if path.is_absolute():
+            error_msg = f"File not found: {path}"
+            self._logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
+        # File doesn't exist directly and is a relative path/filename - search in base directories
+        filename = path.name
+        self._logger.debug(f"Searching for '{filename}' in base directories...")
+        
+        for base_dir in self._base_dirs:
+            if not base_dir.exists():
+                continue
+            
+            # Try exact match first
+            exact_path = base_dir / filename
+            if exact_path.exists():
+                self._logger.debug(f"Exact match found: {exact_path}")
+                return exact_path.resolve()
+            
+            # Try UUID pattern matching (e.g., <uuid>_BI-reportTasks.xlsx)
+            uuid_pattern = f"*{filename}"
+            matches = list(base_dir.glob(uuid_pattern))
+            
+            if matches:
+                # Sort by modification time (most recent first) and return the newest
+                matches.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                resolved_path = matches[0]
+                self._logger.debug(f"UUID pattern match found (most recent): {resolved_path}")
+                return resolved_path.resolve()
+        
+        # File not found - prepare helpful error message
+        search_dirs_str = ", ".join(str(d) for d in self._base_dirs)
+        error_msg = (
+            f"File not found: {filename}\n"
+            f"Searched in directories: [{search_dirs_str}]\n"
+            f"Hint: If running in Docker, ensure the file is mounted via volume. "
+            f"Set MCP_FILE_DIRS environment variable to specify custom search paths."
+        )
+        
+        self._logger.error(error_msg)
+        raise FileNotFoundError(error_msg)
 
     def _detect_format(self, file_path: Path) -> str:
         """Detect Excel file format from extension.
@@ -74,7 +179,8 @@ class FileLoader:
         """Load Excel file into DataFrame.
 
         Args:
-            file_path: Absolute path to the Excel file
+            file_path: Path to the Excel file (absolute path or simple filename).
+                      If a simple filename is provided, searches in configured base directories.
             sheet_name: Sheet name or index (default: 0 = first sheet)
             header_row: Row index to use as header (None = auto-detect)
             use_cache: Whether to use cache (default: True)
@@ -84,17 +190,12 @@ class FileLoader:
             Loaded DataFrame
 
         Raises:
-            FileNotFoundError: If file doesn't exist
+            FileNotFoundError: If file doesn't exist in any base directory
             ValueError: If file format is unsupported
             Exception: If file cannot be read
         """
-        path = Path(file_path)
-
-        if not path.exists():
-            raise FileNotFoundError(
-                f"File not found: {file_path}\n"
-                f"Please use an absolute path to the file."
-            )
+        # Resolve path with UUID pattern matching support
+        path = self._resolve_path(file_path)
         
         # Try cache first
         if use_cache:
@@ -137,22 +238,18 @@ class FileLoader:
         """Get list of sheet names in Excel file.
 
         Args:
-            file_path: Absolute path to the Excel file
+            file_path: Path to the Excel file (absolute path or simple filename).
+                      If a simple filename is provided, searches in configured base directories.
 
         Returns:
             List of sheet names
 
         Raises:
-            FileNotFoundError: If file doesn't exist
+            FileNotFoundError: If file doesn't exist in any base directory
             ValueError: If file format is unsupported
         """
-        path = Path(file_path)
-
-        if not path.exists():
-            raise FileNotFoundError(
-                f"File not found: {file_path}\n"
-                f"Please use an absolute path to the file."
-            )
+        # Resolve path with UUID pattern matching support
+        path = self._resolve_path(file_path)
 
         file_format = self._detect_format(path)
         engine = self._get_engine(file_format)
@@ -168,21 +265,17 @@ class FileLoader:
         """Get basic information about Excel file.
 
         Args:
-            file_path: Absolute path to the Excel file
+            file_path: Path to the Excel file (absolute path or simple filename).
+                      If a simple filename is provided, searches in configured base directories.
 
         Returns:
             Dictionary with file information
 
         Raises:
-            FileNotFoundError: If file doesn't exist
+            FileNotFoundError: If file doesn't exist in any base directory
         """
-        path = Path(file_path)
-
-        if not path.exists():
-            raise FileNotFoundError(
-                f"File not found: {file_path}\n"
-                f"Please use an absolute path to the file."
-            )
+        # Resolve path with UUID pattern matching support
+        path = self._resolve_path(file_path)
 
         file_format = self._detect_format(path)
         file_size = os.path.getsize(path)

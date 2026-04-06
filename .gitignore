@@ -55,3 +55,7 @@ sample_files/
 
 # Logs
 *.log
+
+# Other
+.opencode
+.tmp

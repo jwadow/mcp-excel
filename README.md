@@ -15,7 +15,7 @@ Made with ❤️ for mom by [@Jwadow](https://github.com/jwadow)
 
 **Analyze Excel spreadsheets with your AI agent through atomic operations — no data dumping into AI context**
 
-*Works with OpenCode, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
+*Works with OpenCode, OpenWebUI, Claude Code, Codex app, Cursor, Cline, Roo Code, Kilo Code and other MCP-compatible AI agents*
 
 [Why This Exists](#-why-this-exists) • [My Mom's Review](#-my-moms-review) • [What Your Agent Can Do](#-what-your-agent-can-do) • [Installation](#%EF%B8%8F-installation--configuration) • [💖 Donate](#-support-the-project)
 
@@ -224,6 +224,41 @@ pip install "mcp>=1.1.0" "pandas>=2.2.0" "pydantic>=2.10.0" "xlrd>=2.0.1" "openp
 ```
 
 ⚠️ **Warning:** This pollutes your global Python environment. Use Poetry or venv instead.
+
+</details>
+
+<details>
+<summary><b>💬 Option D: Docker Container (for OpenWebUI)</b></summary>
+
+**Build a docker image**
+```bash
+docker build -t mcp-excel:latest .
+```
+
+**Run a docker container**
+
+If you are running open-webui on docker you have to mount its volume:
+```bash
+docker run -p <MCP_PORT>:8000 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name mcp-excel mcp-excel:latest
+```
+
+In case you running open-webui locally without docker:
+```bash
+docker run -p <MCP_PORT>:8000 --add-host=host.docker.internal:host-gateway -e MCP_FILE_DIRS=/path/to/open-webui/files/store --name mcp-excel mcp-excel:latest
+```
+
+**Connect to mcp to open-webui**
+
+Go to `Admin Panel -> Settings -> Integrations`
+
+Create add new connection: provide name, description and link.
+
+Either of these links should work:
++ `http://host.docker.internal:<MCP_PORT>`
++ `http://172.17.0.1:<MCP_PORT>`
++ `http://localhost:<MCP_PORT>`
+
+For the best experience, create custom agent via workspace and assign [next system prompt](./SYSTEM_PROMPT.md)
 
 </details>
 
